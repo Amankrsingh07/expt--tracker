@@ -1,0 +1,2 @@
+// disabled prisma config (mjs)
+export default {};

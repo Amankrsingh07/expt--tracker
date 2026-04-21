@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String    @unique
+  password  String
+  createdAt DateTime  @default(now())
+  expenses  Expense[]
+  categories Category[]
+  limit     Limit?
+  incomes   Income[]
+}
+
+model Expense {
+  id          Int      @id @default(autoincrement())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      Int
+  amount      Float
+  category    Category @relation(fields: [categoryId], references: [id])
+  categoryId  Int
+  description String?
+  date        DateTime
+}
+
+model Category {
+  id       Int       @id @default(autoincrement())
+  user     User      @relation(fields: [userId], references: [id])
+  userId   Int
+  name     String
+  expenses Expense[]
+}
+
+model Limit {
+  id           Int    @id @default(autoincrement())
+  user         User   @relation(fields: [userId], references: [id])
+  userId       Int    @unique
+  monthlyLimit Float
+}
+
+model Income {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  amount    Float
+  source    String   // Salary, Freelance, Other
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+}

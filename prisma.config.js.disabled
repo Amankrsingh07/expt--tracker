@@ -1,0 +1,13 @@
+// Prisma CLI config for local development using SQLite.
+// Provide the datasource.url here (Prisma v7+ requires this to be in the config).
+module.exports = {
+  datasources: {
+    db: {
+      provider: 'sqlite',
+      // Relative to project root
+      url: 'file:./prisma/dev.db',
+    },
+  },
+  // optional: set the default schema path
+  schema: './prisma/schema.prisma',
+};

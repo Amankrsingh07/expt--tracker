@@ -1,3 +1,43 @@
+# Expense Tracker (Next.js + Prisma + MySQL)
+
+This project is a scaffold for an Expense Tracker application using Next.js App Router, Prisma (MySQL), JWT auth, Tailwind CSS and Recharts for charts.
+
+What I added:
+- Prisma schema (prisma/schema.prisma)
+- Prisma client wrapper (lib/prisma.js)
+- Auth helpers (lib/auth.js)
+- API routes under `app/api/*` for auth, expenses, categories and limit
+- Pages for signup, login, dashboard, expenses list and add-expense
+- Components: Layout, Navbar, ExpenseForm, DashboardCharts
+- Hook: `hooks/useUser.js`
+
+Important env variables (.env):
+
+DATABASE_URL="mysql://USER:PASSWORD@HOST:PORT/DATABASE"
+JWT_SECRET="a-long-secret"
+
+Setup instructions:
+
+1. Install dependencies
+
+   npm install next react react-dom prisma @prisma/client bcryptjs jsonwebtoken react-hook-form zod recharts tailwindcss postcss autoprefixer
+
+2. Initialize Prisma client (generate)
+
+   npx prisma generate
+
+3. Create migration and push to your MySQL database
+
+   npx prisma migrate dev --name init
+
+4. Start dev server
+
+   npm run dev
+
+Notes and next steps:
+- This scaffold focuses on core functionality. For production you'd want stricter validation (zod + react-hook-form), better error handling, rate limiting and email verification.
+- Install and configure shadcn/ui components (I used simple components here). Replace plain elements with shadcn components for the refined UI.
+- Add toasts and skeletons via shadcn or your choice of UI primitives.
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
 ## Getting Started

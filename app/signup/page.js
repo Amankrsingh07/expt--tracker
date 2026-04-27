@@ -65,91 +65,110 @@ export default function SignupPage() {
   };
 
   return (
-    <>
-      <Navbar />
+  <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-indigo-50 to-purple-100 dark:from-slate-900 dark:to-slate-950">
 
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 px-4">
-        <Card className="w-full max-w-md shadow-xl">
-          <CardHeader>
-            <CardTitle className="text-center text-2xl">
-              Create Account
-            </CardTitle>
-          </CardHeader>
+    <div className="w-full max-w-md">
 
-          <CardContent>
-            <form
-              onSubmit={handleSubmit(onSubmit)}
-              className="space-y-4"
-            >
-              {/* Name */}
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input autoFocus {...register("name")} />
-                {errors.name && (
-                  <p className="text-red-500 text-sm">
-                    {errors.name.message}
-                  </p>
-                )}
-              </div>
+      {/* 🔷 Branding */}
+      <div className="text-center mb-6">
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
+          ExpensePro
+        </h1>
+        <p className="text-sm text-muted mt-1">
+          Create your account to get started
+        </p>
+      </div>
 
-              {/* Email */}
-              <div className="space-y-2">
-                <Label>Email</Label>
-                <Input type="email" {...register("email")} />
-                {errors.email && (
-                  <p className="text-red-500 text-sm">
-                    {errors.email.message}
-                  </p>
-                )}
-              </div>
+      {/* 🧾 Card */}
+      <Card className="shadow-2xl border border-gray-200 dark:border-gray-800 backdrop-blur-md bg-white/70 dark:bg-slate-900/70">
+        
+        <CardHeader>
+          <CardTitle className="text-center text-xl">
+            Sign Up
+          </CardTitle>
+        </CardHeader>
 
-              {/* Password */}
-              <div className="space-y-2">
-                <Label>Password</Label>
-                <Input type="password" {...register("password")} />
-                {errors.password && (
-                  <p className="text-red-500 text-sm">
-                    {errors.password.message}
-                  </p>
-                )}
-              </div>
+        <CardContent>
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            className="space-y-5"
+          >
 
-              {/* Confirm Password */}
-              <div className="space-y-2">
-                <Label>Confirm Password</Label>
-                <Input type="password" {...register("confirmPassword")} />
-                {errors.confirmPassword && (
-                  <p className="text-red-500 text-sm">
-                    {errors.confirmPassword.message}
-                  </p>
-                )}
-              </div>
-
-              {/* Error Message */}
-              {error && (
-                <p className="text-red-500 text-sm text-center">
-                  {error}
+            {/* Name */}
+            <div className="space-y-1">
+              <Label>Name</Label>
+              <Input placeholder="John Doe" {...register("name")} />
+              {errors.name && (
+                <p className="text-red-500 text-xs">
+                  {errors.name.message}
                 </p>
               )}
+            </div>
 
-              {/* Submit Button */}
-              <Button
-                className="w-full"
-                disabled={!isValid || loading}
-              >
-                {loading ? "Creating account..." : "Sign Up"}
-              </Button>
-            </form>
+            {/* Email */}
+            <div className="space-y-1">
+              <Label>Email</Label>
+              <Input type="email" placeholder="you@example.com" {...register("email")} />
+              {errors.email && (
+                <p className="text-red-500 text-xs">
+                  {errors.email.message}
+                </p>
+              )}
+            </div>
 
-            <p className="text-center text-sm mt-4">
-              Already have an account?{" "}
-              <Link href="/login" className="text-blue-600">
-                Login
-              </Link>
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    </>
-  );
+            {/* Password */}
+            <div className="space-y-1">
+              <Label>Password</Label>
+              <Input type="password" placeholder="••••••••" {...register("password")} />
+              {errors.password && (
+                <p className="text-red-500 text-xs">
+                  {errors.password.message}
+                </p>
+              )}
+            </div>
+
+            {/* Confirm Password */}
+            <div className="space-y-1">
+              <Label>Confirm Password</Label>
+              <Input type="password" placeholder="••••••••" {...register("confirmPassword")} />
+              {errors.confirmPassword && (
+                <p className="text-red-500 text-xs">
+                  {errors.confirmPassword.message}
+                </p>
+              )}
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="text-red-500 text-sm text-center bg-red-50 dark:bg-red-900/30 p-2 rounded">
+                {error}
+              </div>
+            )}
+
+            {/* Submit */}
+            <Button
+              className="w-full mt-2"
+              disabled={!isValid || loading}
+            >
+              {loading ? "Creating account..." : "Create Account"}
+            </Button>
+
+          </form>
+
+          {/* Footer */}
+          <p className="text-center text-sm mt-6 text-muted">
+            Already have an account?{" "}
+            <Link
+              href="/login"
+              className="text-indigo-600 hover:underline"
+            >
+              Login
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
+
+    </div>
+  </div>
+);
 }

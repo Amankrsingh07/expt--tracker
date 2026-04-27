@@ -2,6 +2,7 @@
 
 import Layout from "@/components/Layout";
 import DashboardCharts from "@/components/DashboardCharts";
+import FinancialDashboard from "@/components/FinancialDashboard";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 
@@ -9,6 +10,7 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expenses, setExpenses] = useState([]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const pollingRef = useRef(null);
   const router = useRouter();
 
@@ -75,65 +77,102 @@ export default function DashboardPage() {
   }, [router]);
 
   // ✅ Loading UI
-  if (loading) {
-    return (
-      <Layout>
-        <div className="text-center py-10 text-gray-500">
-          Loading dashboard...
-        </div>
-      </Layout>
-    );
-  }
+  // if (loading) {
+  //   return (
+  //     <Layout>
+  //       <div className="text-center py-10 text-gray-500">
+  //         Loading dashboard...
+  //       </div>
+  //     </Layout>
+  //   );
+  // }
 
-  return (
-    <Layout>
-      <h1 className="text-2xl font-semibold mb-4">
-        Welcome, {summary?.user?.name} 👋
-      </h1>
+ return (
+  <Layout>
+    <div className="space-y-8">
 
-  <div className="grid gap-4">
-        {/* Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-          {/* Total */}
-          <div className="p-4 bg-white dark:bg-gray-800 rounded shadow">
-            <h3 className="text-sm text-gray-500 mb-2">This Month</h3>
-            <div className="text-3xl font-bold text-blue-600">
-              ₹{summary?.total?.toFixed(2) || "0.00"}
-            </div>
-          </div>
-
-          {/* Limit */}
-          <div className="p-4 bg-white dark:bg-gray-800 rounded shadow">
-            <h3 className="text-sm text-gray-500 mb-2">Limit</h3>
-            <div className="text-3xl font-bold text-green-600">
-              {/* ₹{summary.limit?.toFixed(2) || "0.00"} */}
-              ₹{summary?.limit?.toFixed(2) || "0.00"}
-
-            </div>
-          </div>
-
-          {/* Remaining */}
-          <div className="p-4 bg-white dark:bg-gray-800 rounded shadow">
-            <h3 className="text-sm text-gray-500 mb-2">Remaining</h3>
-            <div
-  className={`text-3xl font-bold ${
-    summary?.remaining < 0
-      ? "text-red-600"
-      : "text-purple-600"
-  }`}
->
-             
-              ₹{summary?.remaining?.toFixed(2) || "0.00"}
-            </div>
-          </div>
+      {/* 🔝 Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">
+            Welcome back, {summary?.user?.name} 👋
+          </h1>
+          <p className="text-sm text-muted">
+            Here’s your financial overview for this month
+          </p>
         </div>
 
-        {/* Charts */}
-        <div className="bg-white dark:bg-gray-800 rounded shadow p-4">
-          <DashboardCharts expenses={expenses} />
+        {/* Toggle */}
+        <div className="flex bg-surface border rounded-xl p-1">
+          <button
+            onClick={() => setShowAdvanced(false)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              !showAdvanced
+                ? 'bg-indigo-600 text-white shadow'
+                : 'text-muted hover:bg-gray-100 dark:hover:bg-gray-800'
+            }`}
+          >
+            Simple
+          </button>
+
+          <button
+            onClick={() => setShowAdvanced(true)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+              showAdvanced
+                ? 'bg-indigo-600 text-white shadow'
+                : 'text-muted hover:bg-gray-100 dark:hover:bg-gray-800'
+            }`}
+          >
+            Advanced
+          </button>
         </div>
       </div>
-    </Layout>
-  );
+
+      {/* 💰 Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        <div className="card">
+          <p className="text-sm text-muted">This Month Spent</p>
+          <p className="text-2xl font-bold text-blue-600 mt-2">
+            ₹{summary?.total?.toFixed(2) || "0.00"}
+          </p>
+        </div>
+
+        <div className="card">
+          <p className="text-sm text-muted">Monthly Limit</p>
+          <p className="text-2xl font-bold text-green-600 mt-2">
+            ₹{summary?.limit?.toFixed(2) || "0.00"}
+          </p>
+        </div>
+
+        <div className="card">
+          <p className="text-sm text-muted">Remaining Budget</p>
+          <p className={`text-2xl font-bold mt-2 ${
+            summary?.remaining < 0 ? 'text-red-500' : 'text-indigo-600'
+          }`}>
+            ₹{summary?.remaining?.toFixed(2) || "0.00"}
+          </p>
+        </div>
+
+      </div>
+
+      {/* 📊 Content */}
+      <div className="card">
+
+        {!showAdvanced ? (
+          <>
+            <h2 className="text-lg font-semibold mb-4">
+              Expense Overview
+            </h2>
+            <DashboardCharts expenses={expenses} />
+          </>
+        ) : (
+          <FinancialDashboard />
+        )}
+
+      </div>
+
+    </div>
+  </Layout>
+);
 }

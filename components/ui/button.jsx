@@ -18,9 +18,9 @@ const Button = React.forwardRef(
       default:
         "bg-blue-600 text-white hover:bg-blue-700",
       outline:
-        "border border-gray-300 dark:border-gray-600 bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700",
+        "border border-gray-300 bg-transparent hover:bg-surface",
       ghost:
-        "hover:bg-gray-100 dark:hover:bg-gray-700",
+        "hover:bg-surface",
       destructive:
         "bg-red-600 text-white hover:bg-red-700",
     };
@@ -36,6 +36,7 @@ const Button = React.forwardRef(
         ref={ref}
         className={cn(
           "inline-flex items-center justify-center rounded-lg font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none",
+          "focus:ring-[color:var(--foreground)]",
           variants[variant],
           sizes[size],
           className

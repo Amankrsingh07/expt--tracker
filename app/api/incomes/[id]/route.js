@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '../../../../lib/prisma';
 import { getUserFromRequest } from '../../../../lib/auth';
 
-// GET single income
+// ✅ GET SINGLE EXPENSE
+
 export async function GET(req, context) {
   const user = await getUserFromRequest(req);
 
@@ -13,24 +14,25 @@ export async function GET(req, context) {
   const { params } = context;
   const resolvedParams = await params;
 
-  const id = resolvedParams?.id;
+  const id = parseInt(resolvedParams?.id, 10);
 
-  if (!id) {
+  if (isNaN(id)) {
     return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
   }
 
-  const income = await prisma.income.findUnique({
-    where: { id }
+  const expense = await prisma.expense.findUnique({
+    where: { id },
+    include: { category: true }
   });
 
-  if (!income || income.userId !== user.id) {
+  if (!expense || expense.userId !== user.id) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 
-  return NextResponse.json({ income });
+  return NextResponse.json({ expense });
 }
 
-// UPDATE income
+// ✅ UPDATE EXPENSE
 export async function PUT(req, context) {
   const user = await getUserFromRequest(req);
 
@@ -43,28 +45,31 @@ export async function PUT(req, context) {
 
   try {
     const body = await req.json();
-    const id = resolvedParams?.id;
+    const id = parseInt(resolvedParams?.id, 10);
 
-    if (!id) {
+    if (isNaN(id)) {
       return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
     }
 
-    const existing = await prisma.income.findUnique({ where: { id } });
+    const existing = await prisma.expense.findUnique({
+      where: { id }
+    });
 
     if (!existing || existing.userId !== user.id) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const updated = await prisma.income.update({
+    const updated = await prisma.expense.update({
       where: { id },
       data: {
-        amount: body.amount !== undefined ? Number(body.amount) : existing.amount,
-        source: body.source !== undefined ? body.source : existing.source,
-        date: body.date ? new Date(body.date) : existing.date
+        amount: Number(body.amount),
+        categoryId: Number(body.categoryId),
+        description: body.description || '',
+        date: new Date(body.date)
       }
     });
 
-    return NextResponse.json({ income: updated });
+    return NextResponse.json({ expense: updated });
 
   } catch (e) {
     console.error(e);
@@ -72,36 +77,30 @@ export async function PUT(req, context) {
   }
 }
 
-// DELETE income
-export async function DELETE(req, context) {
-  const user = await getUserFromRequest(req);
+// ✅ DELETE EXPENSE
+// import prisma from "@/lib/prisma";
 
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
 
+
+export async function DELETE(req, { params }) {
   try {
-    const { params } = context;
-    const resolvedParams = await params;
+    // ✅ unwrap params (IMPORTANT)
+    const { id } = await params;
 
-    const id = resolvedParams?.id;
+    console.log("DELETE ID:", id);
 
     if (!id) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+      return Response.json({ error: "ID missing" }, { status: 400 });
     }
 
-    const existing = await prisma.income.findUnique({ where: { id } });
+    await prisma.income.delete({
+      where: { id }
+    });
 
-    if (!existing || existing.userId !== user.id) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
+    return Response.json({ message: "Deleted successfully" });
 
-    await prisma.income.delete({ where: { id } });
-
-    return NextResponse.json({ success: true });
-
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: 'Delete failed' }, { status: 500 });
+  } catch (error) {
+    console.error("DELETE ERROR:", error);
+    return Response.json({ error: error.message }, { status: 500 });
   }
 }

@@ -1,98 +1,106 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
 
 export default function AddIncome({ onSuccess }) {
-  const [amount, setAmount] = useState('');
-  const [source, setSource] = useState('');
-  const [customSource, setCustomSource] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0,10));
+  const [amount, setAmount] = useState("");
+  const [source, setSource] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const userId = 1; // replace later with real auth
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
 
-    const finalSource = source === 'Other' ? customSource : source;
-
-    try {
-      const res = await fetch('/api/incomes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          amount: Number(amount),
-          source: finalSource || 'Other',
-          date: date || new Date().toISOString()
-        })
-      });
-
-      const j = await res.json();
-
-      if (res.ok) {
-        alert('Income Added Successfully ✅');
-        if (onSuccess) onSuccess();
-      } else {
-        alert(j.error || 'Error adding income');
-      }
-
-    } catch (err) {
-      console.error(err);
-      alert('Server error');
+    if (!amount || !source) {
+      alert("Please fill all fields");
+      return;
     }
 
-    setLoading(false);
+    try {
+      setLoading(true);
+
+      const res = await fetch("/api/incomes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: Number(amount),
+          source,
+          userId,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "Failed");
+
+      setAmount("");
+      setSource("");
+      onSuccess?.();
+
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="max-w-md mx-auto">
 
-      <input
-        type="number"
-        placeholder="Enter Amount"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        className="w-full p-2 border rounded"
-        required
-      />
+      <div className="card space-y-6">
 
-      <select
-        value={source}
-        onChange={(e) => setSource(e.target.value)}
-        className="w-full p-2 border rounded"
-        required
-      >
-        <option value="">Select Source</option>
-        <option value="Salary">Salary</option>
-        <option value="Freelance">Freelance</option>
-        <option value="Business">Business</option>
-        <option value="Other">Other</option>
-      </select>
+        {/* 🔝 Title */}
+        <div>
+          <h2 className="text-xl font-semibold">Add Income</h2>
+          <p className="text-sm text-muted">
+            Record money you’ve received
+          </p>
+        </div>
 
-      {source === 'Other' && (
-        <input
-          type="text"
-          placeholder="Custom source"
-          value={customSource}
-          onChange={(e) => setCustomSource(e.target.value)}
-          className="w-full p-2 border rounded"
-          required
-        />
-      )}
+        <form onSubmit={handleSubmit} className="space-y-5">
 
-      <input
-        type="date"
-        value={date}
-        onChange={(e) => setDate(e.target.value)}
-        className="w-full p-2 border rounded"
-        required
-      />
+          {/* 💰 Amount */}
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Amount</label>
+            <input
+              type="number"
+              placeholder="₹ 0.00"
+              className="input"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+            />
+          </div>
 
-      <Button type="submit" disabled={loading}>
-        {loading ? 'Adding...' : 'Add Income'}
-      </Button>
+          {/* 🏷 Source */}
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Source</label>
+            <input
+              type="text"
+              placeholder="Salary, Freelance, etc."
+              className="input"
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              required
+            />
+          </div>
 
-    </form>
+          {/* 🚀 Submit */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full btn btn-primary"
+          >
+            {loading ? "Adding..." : "Add Income"}
+          </button>
+
+        </form>
+
+      </div>
+
+    </div>
   );
 }

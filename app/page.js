@@ -51,16 +51,16 @@ export default function Home() {
 
           {/* Features */}
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900 text-center">
+            <div className="p-3 rounded-lg bg-surface text-center">
               💰 Track Expenses
             </div>
-            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900 text-center">
+            <div className="p-3 rounded-lg bg-surface text-center">
               📊 Smart Charts
             </div>
-            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900 text-center">
+            <div className="p-3 rounded-lg bg-surface text-center">
               ⚡ Monthly Limits
             </div>
-            <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900 text-center">
+            <div className="p-3 rounded-lg bg-surface text-center">
               🌙 Dark Mode
             </div>
           </div>

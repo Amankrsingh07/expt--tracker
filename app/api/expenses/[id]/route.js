@@ -1,120 +1,134 @@
-import { NextResponse } from 'next/server';
-import prisma from '../../../../lib/prisma';
-import { getUserFromRequest } from '../../../../lib/auth';
+import prisma from "@/lib/prisma";
 
-// ✅ GET SINGLE EXPENSE
-
-export async function GET(req, context) {
-  const user = await getUserFromRequest(req);
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { params } = context;
-  const resolvedParams = await params;
-
-  const id = parseInt(resolvedParams?.id, 10);
-
-  if (isNaN(id)) {
-    return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
-  }
-
-  const expense = await prisma.expense.findUnique({
-    where: { id },
-    include: { category: true }
-  });
-
-  if (!expense || expense.userId !== user.id) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  return NextResponse.json({ expense });
-}
-
-// ✅ UPDATE EXPENSE
-export async function PUT(req, context) {
-  const user = await getUserFromRequest(req);
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { params } = context;
-  const resolvedParams = await params;
-
+// ✅ GET single expense
+export async function GET(req, { params }) {
   try {
-    const body = await req.json();
-    const id = parseInt(resolvedParams?.id, 10);
+    // ⚠️ Next.js params is async
+    const { id } = await params;
 
-    if (isNaN(id)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+    if (!id) {
+      return Response.json(
+        { error: "Expense ID is required" },
+        { status: 400 }
+      );
     }
 
-    const existing = await prisma.expense.findUnique({
-      where: { id }
+    const expense = await prisma.expense.findUnique({
+      where: { id: Number(id) },
+      include: {
+        category: true, // 👈 needed for expense.category?.name in frontend
+      },
     });
 
-    if (!existing || existing.userId !== user.id) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!expense) {
+      return Response.json(
+        { error: "Expense not found" },
+        { status: 404 }
+      );
     }
 
-    const updated = await prisma.expense.update({
-      where: { id },
-      data: {
-        amount: Number(body.amount),
-        categoryId: Number(body.categoryId),
-        description: body.description || '',
-        date: new Date(body.date)
-      }
-    });
+    return Response.json({ expense });
 
-    return NextResponse.json({ expense: updated });
+  } catch (error) {
+    console.error("GET EXPENSE ERROR:", error);
 
-  } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    return Response.json(
+      { error: error.message },
+      { status: 500 }
+    );
   }
 }
+// DELETE expense
+// export async function DELETE(req, { params }) {
+//   try {
+//     const { id } = params;
 
-// ✅ DELETE EXPENSE
+//     if (!id) {
+//       return Response.json(
+//         { error: "Expense ID is required" },
+//         { status: 400 }
+//       );
+//     }
 
-export async function DELETE(req, context) {
-  const user = await getUserFromRequest(req);
+//     const expenseId = Number(id);
 
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+//     if (isNaN(expenseId)) {
+//       return Response.json(
+//         { error: "Invalid expense ID" },
+//         { status: 400 }
+//       );
+//     }
 
+//     // Check if exists
+//     const existing = await prisma.expense.findUnique({
+//       where: { id: expenseId }
+//     });
+
+//     if (!existing) {
+//       return Response.json(
+//         { error: "Expense not found" },
+//         { status: 404 }
+//       );
+//     }
+
+//     // Delete
+//     await prisma.expense.delete({
+//       where: { id: expenseId }
+//     });
+
+//     return Response.json({
+//       message: "Expense deleted successfully"
+//     });
+
+//   } catch (error) {
+//     console.error("DELETE EXPENSE ERROR:", error);
+
+//     return Response.json(
+//       { error: "Internal server error" },
+//       { status: 500 }
+//     );
+//   }
+// }
+// DELETE expense
+export async function DELETE(req, { params }) {
   try {
-    // ✅ FIX: await params
-    const { params } = context;
-    const resolvedParams = await params;
+    // ✅ IMPORTANT (Next.js async params)
+    const { id } = await params;
 
-    console.log("PARAMS:", resolvedParams);
-
-    const id = parseInt(resolvedParams?.id, 10);
-
-    if (isNaN(id)) {
-      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+    if (!id) {
+      return Response.json(
+        { error: "Expense ID is required" },
+        { status: 400 }
+      );
     }
 
+    // Optional: check if exists
     const existing = await prisma.expense.findUnique({
-      where: { id }
+      where: { id: Number(id) }
     });
 
-    if (!existing || existing.userId !== user.id) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (!existing) {
+      return Response.json(
+        { error: "Expense not found" },
+        { status: 404 }
+      );
     }
 
+    // ✅ Delete
     await prisma.expense.delete({
-      where: { id }
+      where: { id: Number(id) }
     });
 
-    return NextResponse.json({ success: true });
+    return Response.json({
+      message: "Expense deleted successfully"
+    });
 
-  } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: 'Delete failed' }, { status: 500 });
+  } catch (error) {
+    console.error("DELETE EXPENSE ERROR:", error);
+
+    return Response.json(
+      { error: error.message },
+      { status: 500 }
+    );
   }
 }

@@ -81,26 +81,46 @@ export async function PUT(req, context) {
 // import prisma from "@/lib/prisma";
 
 
+export async function DELETE(req, context) {
+  const user = await getUserFromRequest(req);
 
-export async function DELETE(req, { params }) {
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
-    // ✅ unwrap params (IMPORTANT)
-    const { id } = await params;
+    const params = await context.params;
+    const id = params.id;
 
-    console.log("DELETE ID:", id);
+    const income = await prisma.income.findFirst({
+      where: {
+        id,
+        userId: user.id,
+      },
+    });
 
-    if (!id) {
-      return Response.json({ error: "ID missing" }, { status: 400 });
+    if (!income) {
+      return NextResponse.json(
+        { error: "Income not found" },
+        { status: 404 }
+      );
     }
 
     await prisma.income.delete({
-      where: { id }
+      where: {
+        id,
+      },
     });
 
-    return Response.json({ message: "Deleted successfully" });
-
+    return NextResponse.json({
+      message: "Income deleted successfully",
+    });
   } catch (error) {
-    console.error("DELETE ERROR:", error);
-    return Response.json({ error: error.message }, { status: 500 });
+    console.error("Income Delete Error:", error);
+
+    return NextResponse.json(
+      { error: "Failed to delete income" },
+      { status: 500 }
+    );
   }
 }

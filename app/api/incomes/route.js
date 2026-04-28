@@ -1,50 +1,87 @@
-import { db } from "@/lib/db"
+import { NextResponse } from "next/server";
+import prisma from "../../../lib/prisma";
+import { getUserFromRequest } from "../../../lib/auth";
 
-// GET
 export async function GET(req) {
+  const user = await getUserFromRequest(req);
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
-    const { searchParams } = new URL(req.url)
-    const userId = searchParams.get("userId")
+    const { searchParams } = new URL(req.url);
+    const month = searchParams.get("month");
+
+    let dateFilter = {};
+
+    if (month) {
+      const startDate = new Date(`${month}-01T00:00:00`);
+      const endDate = new Date(startDate);
+      endDate.setMonth(endDate.getMonth() + 1);
+
+      dateFilter = {
+        date: {
+          gte: startDate,
+          lt: endDate,
+        },
+      };
+    }
 
     const incomes = await prisma.income.findMany({
-      where: userId ? { userId: Number(userId) } : {},
-      orderBy: { createdAt: "desc" }
-    })
+      where: {
+        userId: user.id,
+        ...dateFilter,
+      },
+      orderBy: {
+        date: "desc",
+      },
+    });
 
-    return Response.json(incomes)
-
+    return NextResponse.json({ incomes });
   } catch (error) {
-    console.error("GET /api/incomes error:", error)
-    return Response.json({ error: error.message }, { status: 500 })
+    console.error("Income Fetch Error:", error);
+
+    return NextResponse.json(
+      { error: "Failed to fetch incomes" },
+      { status: 500 }
+    );
   }
 }
 
-// POST
 export async function POST(req) {
-  try {
-    const body = await req.json()
-    const { amount, source, userId } = body
+  const user = await getUserFromRequest(req);
 
-    // Basic validation
-    if (!amount || !source || !userId) {
-      return Response.json(
-        { error: "amount, source, and userId are required" },
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const { amount, source, date } = await req.json();
+
+    if (!amount || !source) {
+      return NextResponse.json(
+        { error: "Amount and source are required" },
         { status: 400 }
-      )
+      );
     }
 
     const income = await prisma.income.create({
       data: {
+        userId: user.id,
         amount: Number(amount),
         source,
-        userId: Number(userId)
-      }
-    })
+        date: date ? new Date(date) : new Date(),
+      },
+    });
 
-    return Response.json(income)
-
+    return NextResponse.json({ income }, { status: 201 });
   } catch (error) {
-    console.error("POST /api/incomes error:", error)
-    return Response.json({ error: error.message }, { status: 500 })
+    console.error("Income Create Error:", error);
+
+    return NextResponse.json(
+      { error: "Failed to create income" },
+      { status: 500 }
+    );
   }
 }

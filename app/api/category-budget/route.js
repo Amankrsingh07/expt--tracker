@@ -1,92 +1,117 @@
-import { NextResponse } from 'next/server';
-import prisma from '../../../lib/prisma';
-import { getUserFromRequest } from '../../../lib/auth';
+import { NextResponse } from "next/server";
+import prisma from "../../../lib/prisma";
+import { getUserFromRequest } from "../../../lib/auth";
 
-/**
- * POST /api/category-budget
- * Create or update category-wise budget allocation
- */
+function getCurrentMonth() {
+  return new Date().toISOString().slice(0, 7);
+}
+
 export async function POST(req) {
   const user = await getUserFromRequest(req);
+
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const { categoryId, monthlyBudget } = await req.json();
+    const { category, monthlyBudget } = await req.json();
 
-    if (!categoryId || monthlyBudget == null) {
+    if (!category || monthlyBudget == null) {
       return NextResponse.json(
-        { error: 'Missing categoryId or monthlyBudget' },
+        { error: "Missing category or monthlyBudget" },
         { status: 400 }
       );
     }
 
-    // Verify category belongs to user
-    const category = await prisma.category.findFirst({
-      where: { id: parseInt(categoryId), userId: user.id }
+    const month = getCurrentMonth();
+
+    const budget = await prisma.budget.upsert({
+      where: {
+        userId_category_month: {
+          userId: user.id,
+          category,
+          month,
+        },
+      },
+      update: {
+        amount: Number(monthlyBudget),
+      },
+      create: {
+        userId: user.id,
+        category,
+        amount: Number(monthlyBudget),
+        month,
+      },
     });
-
-    if (!category) {
-      return NextResponse.json(
-        { error: 'Category not found' },
-        { status: 404 }
-      );
-    }
-
-    // Create or update category budget
-    // First, check if it exists
-    const existing = await prisma.categoryBudget.findFirst({
-      where: { 
-        categoryId: parseInt(categoryId), 
-        userId: user.id 
-      }
-    });
-
-    const budget = existing 
-      ? await prisma.categoryBudget.update({
-          where: { id: existing.id },
-          data: { monthlyBudget: Number(monthlyBudget) }
-        })
-      : await prisma.categoryBudget.create({
-          data: {
-            categoryId: parseInt(categoryId),
-            userId: user.id,
-            monthlyBudget: Number(monthlyBudget)
-          }
-        });
 
     return NextResponse.json({ budget });
   } catch (error) {
-    console.error('Category Budget Error:', error);
+    console.error("Category Budget Error:", error);
+
     return NextResponse.json(
-      { error: error.message || 'Failed to update category budget' },
+      { error: error.message || "Failed to update category budget" },
       { status: 500 }
     );
   }
 }
 
-/**
- * GET /api/category-budget
- * Get all category budgets for user
- */
+// export async function GET(req) {
+//   const user = await getUserFromRequest(req);
+
+//   if (!user) {
+//     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+//   }
+
+//   try {
+//     const { searchParams } = new URL(req.url);
+//     const month = searchParams.get("month") || getCurrentMonth();
+
+//     const budgets = await prisma.budget.findMany({
+//       where: {
+//         userId: user.id,
+//         month,
+//       },
+//       orderBy: {
+//         createdAt: "desc",
+//       },
+//     });
+
+//     return NextResponse.json({ budgets });
+//   } catch (error) {
+//     console.error("Category Budget Fetch Error:", error);
+
+//     return NextResponse.json(
+//       { error: error.message || "Failed to fetch category budgets" },
+//       { status: 500 }
+//     );
+//   }
+// }
 export async function GET(req) {
   const user = await getUserFromRequest(req);
+
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const budgets = await prisma.categoryBudget.findMany({
-      where: { userId: user.id },
-      include: { category: true }
-    }).catch(() => []);
+    const { searchParams } = new URL(req.url);
+    const month =
+      searchParams.get("month") || new Date().toISOString().slice(0, 7);
+
+    const budgets = await prisma.budget.findMany({
+      where: {
+        userId: user.id,
+        month,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
     return NextResponse.json({ budgets });
   } catch (error) {
-    console.error('Category Budget Fetch Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch category budgets' },
+      { error: error.message || "Failed to fetch budgets" },
       { status: 500 }
     );
   }

@@ -1,98 +1,246 @@
-'use client';
-import { useEffect, useState } from 'react';
-import { PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, ResponsiveContainer } from 'recharts';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+"use client";
 
-const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7f7f', '#0088FE', '#00C49F'];
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
-export default function DashboardCharts({ expenses: propsExpenses }) {
-  const [byCategory, setByCategory] = useState([]);
-  const [byMonth, setByMonth] = useState([]);
-  const [trend, setTrend] = useState([]);
+function money(value) {
+  return `₹${Number(value || 0).toFixed(2)}`;
+}
 
-  useEffect(() => {
-    const loadFrom = async (expenses) => {
-      const catMap = {};
-      const monthMap = {};
-      const trendMap = {};
-      expenses.forEach(e => {
-        const cat = e.category?.name || 'Other';
-        catMap[cat] = (catMap[cat] || 0) + e.amount;
-        const mon = new Date(e.date).toISOString().slice(0,7);
-        monthMap[mon] = (monthMap[mon] || 0) + e.amount;
-        const day = new Date(e.date).toISOString().slice(0,10);
-        trendMap[day] = (trendMap[day] || 0) + e.amount;
-      });
+const COLORS = [
+  "#2563eb",
+  "#16a34a",
+  "#dc2626",
+  "#9333ea",
+  "#f59e0b",
+  "#0891b2",
+  "#db2777",
+  "#64748b",
+];
 
-      setByCategory(Object.entries(catMap).map(([name, value]) => ({ name, value })));
-      setByMonth(Object.entries(monthMap).map(([name, value]) => ({ name, value })));
-      setTrend(Object.entries(trendMap).map(([date, value]) => ({ date, value })));
+export default function AdvancedDashboardCharts({ expenses = [], incomes = [], budgets = [] }) {
+  const categoryData = {};
+
+  expenses.forEach((e) => {
+    const category = e.category?.name || e.categoryName || e.category || "Other";
+    categoryData[category] = (categoryData[category] || 0) + Number(e.amount || 0);
+  });
+
+  const categoryChart = Object.entries(categoryData).map(([name, amount]) => ({
+    name,
+    amount,
+  }));
+
+  const budgetVsSpent = budgets.map((b) => {
+    const spent = categoryData[b.category] || 0;
+
+    return {
+      category: b.category,
+      budget: Number(b.amount || 0),
+      spent,
+      remaining: Number(b.amount || 0) - spent,
     };
+  });
 
-    if (propsExpenses && Array.isArray(propsExpenses)) {
-      loadFrom(propsExpenses);
-    } else {
-      // fallback: fetch current month
-      (async () => {
-        const res = await fetch('/api/expenses?month=' + new Date().toISOString().slice(0,7), { credentials: 'include' });
-        const json = await res.json();
-        const expenses = json.expenses || [];
-        loadFrom(expenses);
-      })();
-    }
-  }, [propsExpenses]);
+  const dailyMap = {};
+
+  expenses.forEach((e) => {
+    const day = new Date(e.date).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+    });
+
+    dailyMap[day] = (dailyMap[day] || 0) + Number(e.amount || 0);
+  });
+
+  const dailyExpenseData = Object.entries(dailyMap).map(([date, amount]) => ({
+    date,
+    amount,
+  }));
+
+  const incomeExpenseData = [
+    {
+      name: "Income",
+      amount: incomes.reduce((sum, i) => sum + Number(i.amount || 0), 0),
+    },
+    {
+      name: "Expense",
+      amount: expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0),
+    },
+  ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <Card className="p-4">
-        <CardHeader>
-          <CardTitle className="text-base">By Category</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={byCategory} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label>
-                {byCategory.map((entry, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+    <div className="space-y-8">
+      {/* Top Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* Category Pie */}
+        <div className="rounded-2xl border bg-white dark:bg-gray-900 p-6 shadow">
+          <h2 className="text-xl font-bold mb-1">Category Expense Share</h2>
+          <p className="text-sm text-gray-500 mb-5">
+            Which category is using most of your money
+          </p>
 
-      <Card className="p-4">
-        <CardHeader>
-          <CardTitle className="text-base">Monthly</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={byMonth}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" fill="#8884d8" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+          {categoryChart.length === 0 ? (
+            <EmptyChart />
+          ) : (
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={categoryChart}
+                    dataKey="amount"
+                    nameKey="name"
+                    innerRadius={70}
+                    outerRadius={110}
+                    paddingAngle={4}
+                    label
+                  >
+                    {categoryChart.map((_, index) => (
+                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => money(value)} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
 
-      <Card className="p-4">
-        <CardHeader>
-          <CardTitle className="text-base">Trend</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={trend}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Line type="monotone" dataKey="value" stroke="#82ca9d" />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        {/* Income vs Expense */}
+        <div className="rounded-2xl border bg-white dark:bg-gray-900 p-6 shadow">
+          <h2 className="text-xl font-bold mb-1">Income vs Expense</h2>
+          <p className="text-sm text-gray-500 mb-5">
+            Compare earning and spending
+          </p>
+
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={incomeExpenseData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip formatter={(value) => money(value)} />
+                <Bar dataKey="amount" radius={[10, 10, 0, 0]}>
+                  {incomeExpenseData.map((_, index) => (
+                    <Cell key={index} fill={index === 0 ? "#16a34a" : "#dc2626"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Budget vs Spent */}
+      <div className="rounded-2xl border bg-white dark:bg-gray-900 p-6 shadow">
+        <h2 className="text-xl font-bold mb-1">Budget vs Spent</h2>
+        <p className="text-sm text-gray-500 mb-5">
+          Category-wise budget comparison
+        </p>
+
+        {budgetVsSpent.length === 0 ? (
+          <EmptyChart />
+        ) : (
+          <div className="h-96">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={budgetVsSpent}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="category" />
+                <YAxis />
+                <Tooltip formatter={(value) => money(value)} />
+                <Legend />
+                <Bar dataKey="budget" fill="#2563eb" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="spent" fill="#dc2626" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="remaining" fill="#16a34a" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      {/* Daily Expense Trend */}
+      <div className="rounded-2xl border bg-white dark:bg-gray-900 p-6 shadow">
+        <h2 className="text-xl font-bold mb-1">Daily Spending Trend</h2>
+        <p className="text-sm text-gray-500 mb-5">
+          See how your expenses changed during the month
+        </p>
+
+        {dailyExpenseData.length === 0 ? (
+          <EmptyChart />
+        ) : (
+          <div className="h-96">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={dailyExpenseData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip formatter={(value) => money(value)} />
+                <Area
+                  type="monotone"
+                  dataKey="amount"
+                  stroke="#2563eb"
+                  fill="#bfdbfe"
+                  strokeWidth={3}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      {/* Category Line */}
+      <div className="rounded-2xl border bg-white dark:bg-gray-900 p-6 shadow">
+        <h2 className="text-xl font-bold mb-1">Category Amount Graph</h2>
+        <p className="text-sm text-gray-500 mb-5">
+          Compare category spending in line form
+        </p>
+
+        {categoryChart.length === 0 ? (
+          <EmptyChart />
+        ) : (
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={categoryChart}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip formatter={(value) => money(value)} />
+                <Line
+                  type="monotone"
+                  dataKey="amount"
+                  stroke="#9333ea"
+                  strokeWidth={3}
+                  dot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EmptyChart() {
+  return (
+    <div className="h-64 flex items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800 border border-dashed">
+      <p className="text-gray-500">No data available for this chart</p>
     </div>
   );
 }

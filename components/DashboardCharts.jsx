@@ -98,8 +98,8 @@ export default function AdvancedDashboardCharts({ expenses = [], incomes = [], b
           {categoryChart.length === 0 ? (
             <EmptyChart />
           ) : (
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-80 min-w-0 min-h-0">
+              <ResponsiveContainer width="100%" height={320}>
                 <PieChart>
                   <Pie
                     data={categoryChart}
@@ -129,8 +129,8 @@ export default function AdvancedDashboardCharts({ expenses = [], incomes = [], b
             Compare earning and spending
           </p>
 
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-80 min-w-0 min-h-0">
+            <ResponsiveContainer width="100%" height={320}>
               <BarChart data={incomeExpenseData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
@@ -154,11 +154,11 @@ export default function AdvancedDashboardCharts({ expenses = [], incomes = [], b
           Category-wise budget comparison
         </p>
 
-        {budgetVsSpent.length === 0 ? (
+          {budgetVsSpent.length === 0 ? (
           <EmptyChart />
         ) : (
-          <div className="h-96">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-96 min-w-0 min-h-0">
+            <ResponsiveContainer width="100%" height={384}>
               <BarChart data={budgetVsSpent}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="category" />
@@ -181,11 +181,11 @@ export default function AdvancedDashboardCharts({ expenses = [], incomes = [], b
           See how your expenses changed during the month
         </p>
 
-        {dailyExpenseData.length === 0 ? (
+          {dailyExpenseData.length === 0 ? (
           <EmptyChart />
         ) : (
-          <div className="h-96">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-96 min-w-0 min-h-0">
+            <ResponsiveContainer width="100%" height={384}>
               <AreaChart data={dailyExpenseData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="date" />
@@ -214,8 +214,8 @@ export default function AdvancedDashboardCharts({ expenses = [], incomes = [], b
         {categoryChart.length === 0 ? (
           <EmptyChart />
         ) : (
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-80 min-w-0 min-h-0">
+            <ResponsiveContainer width="100%" height={320}>
               <LineChart data={categoryChart}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />

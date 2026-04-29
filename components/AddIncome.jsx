@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Input } from '@/components/ui/input';
 
 export default function AddIncome({ onSuccess }) {
   const [amount, setAmount] = useState("");
@@ -65,10 +66,9 @@ export default function AddIncome({ onSuccess }) {
           {/* 💰 Amount */}
           <div className="space-y-1">
             <label className="text-sm font-medium">Amount</label>
-            <input
+            <Input
               type="number"
               placeholder="₹ 0.00"
-              className="input"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               required
@@ -78,10 +78,9 @@ export default function AddIncome({ onSuccess }) {
           {/* 🏷 Source */}
           <div className="space-y-1">
             <label className="text-sm font-medium">Source</label>
-            <input
+            <Input
               type="text"
               placeholder="Salary, Freelance, etc."
-              className="input"
               value={source}
               onChange={(e) => setSource(e.target.value)}
               required

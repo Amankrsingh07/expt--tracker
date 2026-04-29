@@ -2,38 +2,43 @@ import { NextResponse } from 'next/server';
 import prisma from '../../../../lib/prisma';
 import { getUserFromRequest } from '../../../../lib/auth';
 
-/**
- * GET /api/dashboard/summary
- * Returns comprehensive financial overview:
- * - Total Income (all sources: salary, freelance, business, etc.)
- * - Total Expenses (all categories)
- * - Category-wise expense breakdown
- * - Budget allocation & tracking (category-wise)
- * - Remaining budget per category
- * - Overall budget status
- */
 export async function GET(req) {
   const user = await getUserFromRequest(req);
+
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
     const { searchParams } = new URL(req.url);
-    const month = searchParams.get('month') || new Date().toISOString().slice(0, 7);
-    const year = parseInt(searchParams.get('year') || new Date().getFullYear());
 
-    // 📊 1. FETCH ALL INCOMES (Total income from all sources)
-    const incomes = await prisma.income.findMany({
-      where: { userId: user.id },
-      select: { id: true, amount: true, source: true, date: true }
-    });
+    const month =
+      searchParams.get('month') || new Date().toISOString().slice(0, 7);
 
-    // 📊 2. FETCH EXPENSES FOR MONTH WITH CATEGORIES
+    const year = Number(month.slice(0, 4));
+
     const startDate = new Date(`${month}-01`);
     const endDate = new Date(startDate);
     endDate.setMonth(endDate.getMonth() + 1);
 
+    // ✅ Income for selected month
+    const incomes = await prisma.income.findMany({
+      where: {
+        userId: user.id,
+        date: {
+          gte: startDate,
+          lt: endDate
+        }
+      },
+      select: {
+        id: true,
+        amount: true,
+        source: true,
+        date: true
+      }
+    });
+
+    // ✅ Expenses for selected month
     const expenses = await prisma.expense.findMany({
       where: {
         userId: user.id,
@@ -42,127 +47,167 @@ export async function GET(req) {
           lt: endDate
         }
       },
-      include: { category: true }
-    });
-
-    // 📊 3. FETCH BUDGET LIMITS (Overall limit)
-    const budgetLimit = await prisma.limit.findUnique({
-      where: { userId: user.id }
-    });
-
-    // 📊 4. FETCH CATEGORY BUDGETS (Category-wise budget allocation if exists)
-    let categoryBudgets = [];
-    try {
-      categoryBudgets = await prisma.categoryBudget.findMany({
-        where: { userId: user.id }
-      });
-    } catch (err) {
-      // CategoryBudget table might not exist yet
-      categoryBudgets = [];
-    }
-
-    // 💰 CALCULATIONS
-
-    // Total income from all sources
-    const totalIncome = incomes.reduce((sum, inc) => sum + inc.amount, 0);
-
-    // Income source breakdown
-    const incomeBySource = {};
-    incomes.forEach(inc => {
-      const source = inc.source || 'Other';
-      if (!incomeBySource[source]) {
-        incomeBySource[source] = 0;
+      include: {
+        category: true
       }
-      incomeBySource[source] += inc.amount;
     });
 
-    // Total expenses
-    const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+    // ✅ Budgets for selected month
+    const budgets = await prisma.budget.findMany({
+      where: {
+        userId: user.id,
+        month
+      }
+    });
 
-    // Category-wise expense breakdown
+    // =====================
+    // INCOME CALCULATION
+    // =====================
+    const totalIncome = incomes.reduce(
+      (sum, inc) => sum + Number(inc.amount || 0),
+      0
+    );
+
+    const incomeBySource = {};
+
+    incomes.forEach((inc) => {
+      const source = inc.source || 'Other';
+      incomeBySource[source] =
+        (incomeBySource[source] || 0) + Number(inc.amount || 0);
+    });
+
+    // =====================
+    // EXPENSE CALCULATION
+    // =====================
+    const totalExpenses = expenses.reduce(
+      (sum, exp) => sum + Number(exp.amount || 0),
+      0
+    );
+
     const expensesByCategory = {};
     const categoryDetails = {};
 
-    expenses.forEach(exp => {
+    expenses.forEach((exp) => {
       const catName = exp.category?.name || 'Uncategorized';
-      const catId = exp.category?.id;
 
       if (!expensesByCategory[catName]) {
         expensesByCategory[catName] = 0;
-        categoryDetails[catName] = { id: catId, expenses: [] };
+        categoryDetails[catName] = {
+          expenses: []
+        };
       }
-      expensesByCategory[catName] += exp.amount;
+
+      expensesByCategory[catName] += Number(exp.amount || 0);
+
       categoryDetails[catName].expenses.push({
         id: exp.id,
-        amount: exp.amount,
+        amount: Number(exp.amount || 0),
         description: exp.description,
         date: exp.date
       });
     });
 
-    // Budget tracking with allocations
+    // =====================
+    // BUDGET CALCULATION
+    // =====================
     const budgetTracking = {};
-    const categoryBudgetMap = {};
 
-    categoryBudgets.forEach(cb => {
-      categoryBudgetMap[cb.categoryId] = cb.monthlyBudget;
-    });
-
-    Object.entries(expensesByCategory).forEach(([catName, spent]) => {
-      const catId = categoryDetails[catName]?.id;
-      const allocated = categoryBudgetMap[catId] || 0;
+    budgets.forEach((b) => {
+      const categoryName = b.category;
+      const allocated = Number(b.amount || 0);
+      const spent = Number(expensesByCategory[categoryName] || 0);
       const remaining = allocated - spent;
-      const percentUsed = allocated > 0 ? (spent / allocated) * 100 : 0;
 
-      budgetTracking[catName] = {
-        categoryId: catId,
+      budgetTracking[categoryName] = {
         allocated,
         spent,
         remaining,
-        percentUsed: Math.round(percentUsed)
+        percentUsed:
+          allocated > 0 ? Math.round((spent / allocated) * 100) : 0
       };
     });
 
-    // Overall budget status
-    const monthlyLimit = budgetLimit?.monthlyLimit || 0;
-    const remainingBudget = monthlyLimit - totalExpenses;
-    const percentBudgetUsed = monthlyLimit > 0 ? (totalExpenses / monthlyLimit) * 100 : 0;
+    // ✅ Also show expense categories even if budget not set
+    Object.entries(expensesByCategory).forEach(([categoryName, spent]) => {
+      if (!budgetTracking[categoryName]) {
+        budgetTracking[categoryName] = {
+          allocated: 0,
+          spent: Number(spent || 0),
+          remaining: -Number(spent || 0),
+          percentUsed: 0
+        };
+      }
+    });
 
-    // Calculate savings
+    const monthlyLimit = budgets.reduce(
+      (sum, b) => sum + Number(b.amount || 0),
+      0
+    );
+
+    const remainingBudget = monthlyLimit - totalExpenses;
+
+    const percentBudgetUsed =
+      monthlyLimit > 0
+        ? Math.round((totalExpenses / monthlyLimit) * 100)
+        : 0;
+
+    // =====================
+    // SAVINGS
+    // =====================
     const totalSavings = totalIncome - totalExpenses;
-    const savingsRate = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : 0;
+
+    const savingsRate =
+      totalIncome > 0
+        ? Math.round((totalSavings / totalIncome) * 100)
+        : 0;
 
     return NextResponse.json({
-      period: { month, year },
+      period: {
+        month,
+        year
+      },
+
       income: {
         total: totalIncome,
         bySource: incomeBySource,
         count: incomes.length
       },
+
       expenses: {
         total: totalExpenses,
         byCategory: expensesByCategory,
         categoryDetails,
         count: expenses.length
       },
+
       budget: {
         monthlyLimit,
         spent: totalExpenses,
         remaining: remainingBudget,
-        percentUsed: Math.round(percentBudgetUsed),
+        percentUsed: percentBudgetUsed,
         categoryBudgets: budgetTracking
       },
+
       savings: {
         total: totalSavings,
-        rate: Math.round(savingsRate * 100) / 100
+        rate: savingsRate
       },
+
       status: {
-        isBudgetExceeded: totalExpenses > monthlyLimit && monthlyLimit > 0,
-        warning: totalExpenses > monthlyLimit * 0.8 ? 'Approaching budget limit' : null
+        isBudgetExceeded:
+          monthlyLimit > 0 && totalExpenses > monthlyLimit,
+
+        warning:
+          monthlyLimit > 0 && totalExpenses > monthlyLimit
+            ? 'Budget exceeded'
+            : monthlyLimit > 0 && totalExpenses > monthlyLimit * 0.8
+            ? 'Approaching budget limit'
+            : null
       }
     });
   } catch (error) {
     console.error('Dashboard Summary Error:', error);
+
     return NextResponse.json(
       { error: error.message || 'Failed to fetch summary' },
       { status: 500 }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export default function ExpenseForm({ onSuccess }) {
   const [form, setForm] = useState({
@@ -25,21 +26,26 @@ export default function ExpenseForm({ onSuccess }) {
     setBudgetWarning(null); // Clear warning on change
   };
 
+  // Load categories on mount
   useEffect(() => {
-    (async () => {
+    let mounted = true;
+    async function loadCategories() {
       try {
         const res = await fetch('/api/categories', { credentials: 'include' });
-        if (res.ok) {
-          const j = await res.json();
-          setCategories(j.categories || []);
-        }
-      } catch (e) {
-        setCategories([]);
+        if (!res.ok) return setCategories([]);
+        const json = await res.json();
+        if (mounted) setCategories(json.categories || []);
+      } catch (err) {
+        console.error('Failed to load categories', err);
+        if (mounted) setCategories([]);
       }
-    })();
+    }
+
+    loadCategories();
+    return () => { mounted = false; };
   }, []);
 
-  // Check category budget when amount or category changes
+          
   const checkCategoryBudget = async (amount, categoryId) => {
     if (!amount || !categoryId || form.type === 'income') {
       setCategoryBudgetInfo(null);
@@ -99,12 +105,8 @@ export default function ExpenseForm({ onSuccess }) {
 
       setCategoryBudgetInfo(info);
 
+      // Set warning or error based on newSpent
       if (isExceeded) {
-        setBudgetWarning({
-          type: 'error',
-          message: `❌ BUDGET EXCEEDED: Adding ₹${amount} will exceed ${categoryName} budget (limit: ₹${budget}, spent: ₹${spent.toFixed(2)}). You'll overspend by ₹${(newSpent - budget).toFixed(2)}.`
-        });
-      } else if (remaining < 0.01) {
         setBudgetWarning({
           type: 'error',
           message: `❌ BUDGET LIMIT REACHED: No remaining budget for ${categoryName} this month.`
@@ -114,6 +116,8 @@ export default function ExpenseForm({ onSuccess }) {
           type: 'warning',
           message: `⚠️ WARNING: You're approaching ${categoryName} budget limit. ${remaining > 0 ? `Only ₹${remaining.toFixed(2)} remaining.` : 'Budget already exceeded!'}`
         });
+      } else {
+        setBudgetWarning(null);
       }
     } catch (err) {
       console.error('Error checking budget:', err);
@@ -136,7 +140,7 @@ export default function ExpenseForm({ onSuccess }) {
       if (form.category && !isNaN(Number(form.category))) {
         payload.categoryId = Number(form.category);
       } else if (form.category === '__new' && form.newCategory) {
-        // create new category
+        // create new category and register it locally so select shows it
         try {
           const cRes = await fetch('/api/categories', {
             method: 'POST',
@@ -147,6 +151,9 @@ export default function ExpenseForm({ onSuccess }) {
           if (cRes.ok) {
             const cj = await cRes.json();
             payload.categoryId = cj.category.id;
+            // add to local categories and set form to new id so the select displays it
+            setCategories((prev) => [...prev, cj.category]);
+            setForm((f) => ({ ...f, category: String(cj.category.id), newCategory: '' }));
           }
         } catch (e) {
           // ignore category creation error
@@ -158,6 +165,13 @@ export default function ExpenseForm({ onSuccess }) {
       }
 
       // --- Budget pre-check: Check if category budget will be exceeded ---
+      // Client-side guard: ensure categoryId exists for expenses
+      if (form.type === 'expense' && (!payload.categoryId || isNaN(Number(payload.categoryId)))) {
+        alert('Please select or create a valid category before adding an expense.');
+        setLoading(false);
+        return;
+      }
+
       if (form.type === 'expense' && payload.categoryId && categoryBudgetInfo?.isExceeded) {
         const confirmText = `🚨 BUDGET EXCEEDED!\n\nThis expense will exceed the budget:\n- Category: ${categoryBudgetInfo.categoryName}\n- Budget: ₹${categoryBudgetInfo.budget}\n- Already Spent: ₹${categoryBudgetInfo.spent.toFixed(2)}\n- Will Exceed By: ₹${(categoryBudgetInfo.newSpent - categoryBudgetInfo.budget).toFixed(2)}\n\nYou cannot add this expense. Please reduce the amount.`;
         alert(confirmText);
@@ -244,7 +258,7 @@ export default function ExpenseForm({ onSuccess }) {
         {/* 💰 Amount */}
         <div className="space-y-1">
           <label className="text-sm font-medium">Amount</label>
-          <input
+          <Input
             type="number"
             name="amount"
             placeholder="₹ 0.00"
@@ -256,7 +270,6 @@ export default function ExpenseForm({ onSuccess }) {
                 checkCategoryBudget(Number(e.target.value), Number(form.category));
               }
             }}
-            className="input"
             required
           />
         </div>
@@ -280,7 +293,7 @@ export default function ExpenseForm({ onSuccess }) {
                     setBudgetWarning(null);
                   }
                 }}
-                className="input"
+                className="w-full p-2 h-10 rounded-lg bg-white text-black dark:bg-slate-800 dark:text-white border border-gray-300 dark:border-slate-600"
                 required
               >
                 <option value="">Select category</option>
@@ -291,25 +304,24 @@ export default function ExpenseForm({ onSuccess }) {
               </select>
 
               {form.category === '__new' && (
-                <input
+                <Input
                   type="text"
                   name="newCategory"
                   placeholder="New category name"
                   value={form.newCategory}
                   onChange={handleChange}
-                  className="input mt-2"
+                  className="mt-2"
                   required
                 />
               )}
             </>
           ) : (
-            <input
+            <Input
               type="text"
               name="category"
               placeholder="Food, Travel..."
               value={form.category}
               onChange={handleChange}
-              className="input"
               required
             />
           )}
@@ -359,12 +371,11 @@ export default function ExpenseForm({ onSuccess }) {
         {/* 📅 Date */}
         <div className="space-y-1">
           <label className="text-sm font-medium">Date</label>
-          <input
+          <Input
             type="date"
             name="date"
             value={form.date}
             onChange={handleChange}
-            className="input"
             required
           />
         </div>

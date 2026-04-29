@@ -148,7 +148,8 @@ export default function FinancialDashboard({ period = 'month' }) {
       {/* Income */}
       <div className="card">
         <h2 className="font-semibold mb-4">Income Sources</h2>
-        <ResponsiveContainer width="100%" height={260}>
+        <div className="min-w-0 min-h-0">
+          <ResponsiveContainer width="100%" height={260}>
           <PieChart>
             <Pie data={incomeChartData} dataKey="value" outerRadius={90}>
               {incomeChartData.map((_, i) => (
@@ -157,13 +158,15 @@ export default function FinancialDashboard({ period = 'month' }) {
             </Pie>
             <Tooltip formatter={(v) => `₹${v.toFixed(2)}`} />
           </PieChart>
-        </ResponsiveContainer>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       {/* Expenses */}
       <div className="card">
         <h2 className="font-semibold mb-4">Expense Categories</h2>
-        <ResponsiveContainer width="100%" height={260}>
+        <div className="min-w-0 min-h-0">
+          <ResponsiveContainer width="100%" height={260}>
           <PieChart>
             <Pie data={expenseChartData} dataKey="value" outerRadius={90}>
               {expenseChartData.map((_, i) => (
@@ -172,7 +175,8 @@ export default function FinancialDashboard({ period = 'month' }) {
             </Pie>
             <Tooltip formatter={(v) => `₹${v.toFixed(2)}`} />
           </PieChart>
-        </ResponsiveContainer>
+          </ResponsiveContainer>
+        </div>
       </div>
 
     </div>
@@ -180,8 +184,9 @@ export default function FinancialDashboard({ period = 'month' }) {
     {/* 📊 Bar Chart */}
     <div className="card">
       <h2 className="font-semibold mb-4">Budget vs Spending</h2>
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={budgetChartData}>
+      <div className="min-w-0 min-h-0">
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={budgetChartData}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="name" />
           <YAxis />
@@ -191,7 +196,8 @@ export default function FinancialDashboard({ period = 'month' }) {
           <Bar dataKey="spent" fill="#ef4444" />
           <Bar dataKey="remaining" fill="#22c55e" />
         </BarChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
     </div>
 
     {/* 📋 Table */}

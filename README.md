@@ -1,6 +1,69 @@
-# 💰 Expense Tracker SystemA full-stack **Expense Tracker Web Application** built using **Next.js, Prisma ORM, and MySQL**.  This app helps users manage **income, expenses, and budgets** with powerful **month-wise tracking** and smart financial insights.---## 🚀 Features### ✅ Core Features- Add / Delete **Expenses**- Add / Delete **Income**- **Category-wise Budget Management**- **Month-wise filtering** (key feature)- Dashboard showing:  - Total Income  - Total Expense  - Remaining Balance---### 📊 Advanced Features- 🚨 Budget limit alerts- 📅 Month-based data tracking- 🔍 Search & filter expenses- 📂 Category-based expense grouping- 🔔 Notification system- 📈 Summary cards & insights- 🌙 Dark mode support---## 🧠 Smart System Logic- Every record is **month-based**- Budget is linked using:  
+# 💰 Expense Tracker System
+
+A full-stack **Expense Tracker Web Application** built using **Next.js, Prisma ORM, and MySQL**.  
+This app helps users manage **income, expenses, and budgets** with powerful **month-wise tracking** and smart financial insights.
+
+---
+
+## 🚀 Features
+
+### ✅ Core Features
+- Add / Delete **Expenses**
+- Add / Delete **Income**
+- **Category-wise Budget Management**
+- **Month-wise filtering** (key feature)
+- Dashboard showing:
+  - Total Income
+  - Total Expense
+  - Remaining Balance
+
+---
+
+### 📊 Advanced Features
+- 🚨 Budget limit alerts
+- 📅 Month-based data tracking
+- 🔍 Search & filter expenses
+- 📂 Category-based expense grouping
+- 🔔 Notification system
+- 📈 Summary cards & insights
+- 🌙 Dark mode support
+
+---
+
+## 🧠 Smart System Logic
+
+- Every record is **month-based**
+- Budget is linked using:
+  
 user + category + month
-- Prevents overspending using:- Budget warnings- Hard stop when limit exceeded---## 🛠 Tech Stack### Frontend- Next.js (App Router)- React.js- Tailwind CSS### Backend- Next.js API Routes- Prisma ORM### Database- MySQL### Authentication- JWT (cookie-based)---## 📁 Project Structure
+
+- Prevents overspending using:
+- Budget warnings
+- Hard stop when limit exceeded
+
+---
+
+## 🛠 Tech Stack
+
+### Frontend
+- Next.js (App Router)
+- React.js
+- Tailwind CSS
+
+### Backend
+- Next.js API Routes
+- Prisma ORM
+
+### Database
+- MySQL
+
+### Authentication
+- JWT (cookie-based)
+
+---
+
+## 📁 Project Structure
+
 app/
 dashboard/
 expenses/

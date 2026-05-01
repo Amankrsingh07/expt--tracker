@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Moon, Sun, LogOut } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
 export default function Navbar() {
   const router = useRouter();
@@ -68,6 +69,8 @@ export default function Navbar() {
 
         {/* ⚙️ Actions */}
         <div className="flex items-center gap-3">
+
+          <NotificationBell />
 
           {/* ➕ CTA Button */}
           <Link

@@ -1,8 +1,17 @@
+import path from "path";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Allow the development origin (network IP) to access Next dev resources
-  // This resolves the Turbopack cross-origin dev resource warning seen in the logs.
-  allowedDevOrigins: ["http://10.38.107.33:3000", "http://10.176.95.112:3000"],
+  // ✅ Fix Turbopack root issue
+  turbopack: {
+    root: path.resolve(process.cwd()),
+  },
+
+  // ✅ Keep your existing config (DO NOT REMOVE)
+  allowedDevOrigins: [
+    "http://10.38.107.33:3000",
+    "http://10.176.95.112:3000",
+  ],
 };
 
 export default nextConfig;

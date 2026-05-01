@@ -6,6 +6,13 @@ import FinancialDashboard from "@/components/FinancialDashboard";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+function getCurrentMonth() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
 
@@ -15,11 +22,13 @@ export default function DashboardPage() {
   const [incomes, setIncomes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+
+  // ✅ Dashboard always shows latest/current month
+  const month = getCurrentMonth();
 
   useEffect(() => {
     fetchDashboardData();
-  }, [month]);
+  }, []);
 
   async function fetchDashboardData() {
     setLoading(true);
@@ -39,13 +48,17 @@ export default function DashboardPage() {
 
       const [expenseRes, budgetRes, incomeRes] = await Promise.all([
         fetch(`/api/expenses?month=${month}`, { credentials: "include" }),
-        fetch(`/api/category-budget?month=${month}`, { credentials: "include" }),
+        fetch(`/api/category-budget?month=${month}`, {
+          credentials: "include",
+        }),
         fetch(`/api/incomes?month=${month}`, { credentials: "include" }),
       ]);
 
       if (expenseRes.ok) {
         const data = await expenseRes.json();
-        setExpenses(Array.isArray(data) ? data : data.expenses || data.data || []);
+        setExpenses(
+          Array.isArray(data) ? data : data.expenses || data.data || []
+        );
       } else {
         setExpenses([]);
       }
@@ -146,7 +159,7 @@ export default function DashboardPage() {
       type: "application/json",
     });
 
-    downloadFile(blob, `financial-report-${month}.json`);
+    downloadFile(blob, `dashboard-latest-${month}.json`);
   }
 
   function downloadCSV() {
@@ -192,7 +205,7 @@ export default function DashboardPage() {
       type: "text/csv",
     });
 
-    downloadFile(blob, `financial-report-${month}.csv`);
+    downloadFile(blob, `dashboard-latest-${month}.csv`);
   }
 
   function downloadFile(blob, filename) {
@@ -228,17 +241,17 @@ export default function DashboardPage() {
                 Welcome back, {user?.name || "User"} 👋
               </h1>
               <p className="mt-2 text-white/90">
-                Your smart financial dashboard for this month
+                Latest dashboard data for current month: {month}
               </p>
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <input
-                type="month"
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-                className="px-4 py-2 rounded-lg text-black border"
-              />
+              <button
+                onClick={fetchDashboardData}
+                className="px-4 py-2 bg-white text-indigo-700 rounded-lg font-semibold"
+              >
+                🔄 Refresh
+              </button>
 
               <button
                 onClick={downloadCSV}
@@ -342,9 +355,11 @@ export default function DashboardPage() {
           {!showAdvanced ? (
             <>
               <h2 className="text-xl font-bold mb-5">Expense Overview</h2>
-              <DashboardCharts expenses={expenses} 
-              incomes={incomes}
-             budgets={budgets}/>
+              <DashboardCharts
+                expenses={expenses}
+                incomes={incomes}
+                budgets={budgets}
+              />
             </>
           ) : (
             <FinancialDashboard />
@@ -370,7 +385,7 @@ export default function DashboardPage() {
                 {summary.categoryRows.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="p-6 text-center text-gray-500">
-                      No category budgets set.
+                      No category budgets set for current month.
                     </td>
                   </tr>
                 ) : (
@@ -416,7 +431,7 @@ export default function DashboardPage() {
 
           <div className="space-y-3">
             {expenses.length === 0 ? (
-              <p className="text-gray-500">No expenses found.</p>
+              <p className="text-gray-500">No current month expenses found.</p>
             ) : (
               expenses.slice(0, 8).map((expense) => (
                 <div

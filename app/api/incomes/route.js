@@ -9,44 +9,28 @@ export async function GET(req) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    const { searchParams } = new URL(req.url);
-    const month = searchParams.get("month");
+  const { searchParams } = new URL(req.url);
+  const month = searchParams.get("month");
 
-    let dateFilter = {};
+  let where = { userId: user.id };
 
-    if (month) {
-      const startDate = new Date(`${month}-01T00:00:00`);
-      const endDate = new Date(startDate);
-      endDate.setMonth(endDate.getMonth() + 1);
+  if (month) {
+    const start = new Date(`${month}-01T00:00:00.000Z`);
+    const end = new Date(start);
+    end.setUTCMonth(end.getUTCMonth() + 1);
 
-      dateFilter = {
-        date: {
-          gte: startDate,
-          lt: endDate,
-        },
-      };
-    }
-
-    const incomes = await prisma.income.findMany({
-      where: {
-        userId: user.id,
-        ...dateFilter,
-      },
-      orderBy: {
-        date: "desc",
-      },
-    });
-
-    return NextResponse.json({ incomes });
-  } catch (error) {
-    console.error("Income Fetch Error:", error);
-
-    return NextResponse.json(
-      { error: "Failed to fetch incomes" },
-      { status: 500 }
-    );
+    where.date = {
+      gte: start,
+      lt: end,
+    };
   }
+
+  const incomes = await prisma.income.findMany({
+    where,
+    orderBy: { date: "desc" },
+  });
+
+  return NextResponse.json({ incomes });
 }
 
 export async function POST(req) {
@@ -59,9 +43,27 @@ export async function POST(req) {
   try {
     const { amount, source, date } = await req.json();
 
-    if (!amount || !source) {
+    const incomeAmount = Number(amount);
+
+    if (isNaN(incomeAmount) || incomeAmount <= 0) {
+      return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
+    }
+
+    if (!source || source.trim() === "") {
+      return NextResponse.json({ error: "Source is required" }, { status: 400 });
+    }
+
+    let incomeDate;
+
+    if (date) {
+      incomeDate = new Date(`${date}T00:00:00.000Z`);
+    } else {
+      incomeDate = new Date();
+    }
+
+    if (isNaN(incomeDate.getTime())) {
       return NextResponse.json(
-        { error: "Amount and source are required" },
+        { error: "Invalid date format. Send date as YYYY-MM-DD" },
         { status: 400 }
       );
     }
@@ -69,9 +71,9 @@ export async function POST(req) {
     const income = await prisma.income.create({
       data: {
         userId: user.id,
-        amount: Number(amount),
-        source,
-        date: date ? new Date(date) : new Date(),
+        amount: incomeAmount,
+        source: source.trim(),
+        date: incomeDate,
       },
     });
 
@@ -80,7 +82,7 @@ export async function POST(req) {
     console.error("Income Create Error:", error);
 
     return NextResponse.json(
-      { error: "Failed to create income" },
+      { error: error.message || "Failed to create income" },
       { status: 500 }
     );
   }

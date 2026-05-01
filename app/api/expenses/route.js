@@ -1,250 +1,220 @@
-import { NextResponse } from 'next/server';
-import prisma from '../../../lib/prisma';
-import { getUserFromRequest } from '../../../lib/auth';
+import { NextResponse } from "next/server";
+import prisma from "../../../lib/prisma";
+import { getUserFromRequest } from "../../../lib/auth";
 
-// ✅ SINGLE GET (Search + Filter combined)
-// export async function GET(req) {
-//   const user = await getUserFromRequest(req);
-
-//   if (!user) {
-//     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-//   }
-
-//   try {
-//     const { searchParams } = new URL(req.url);
-
-//     const search = searchParams.get('search') || searchParams.get('q');
-//     const month = searchParams.get('month');
-//     const period = searchParams.get('period');
-//     const year = searchParams.get('year');
-//     const categoryId = searchParams.get('categoryId');
-
-//     let where = {
-//       userId: user.id
-//     };
-
-//     // 🔍 SEARCH
-//     if (search) {
-//       where.OR = [
-//         { description: { contains: search, mode: 'insensitive' } },
-//         {
-//           category: {
-//             is: {
-//               name: { contains: search, mode: 'insensitive' }
-//             }
-//           }
-//         }
-//       ];
-//     }
-
-//     // 📅 MONTH FILTER
-//     if (month && (period === 'month' || period === 'last12')) {
-//       const start = new Date(`${month}-01`);
-
-//       if (!isNaN(start.getTime())) {
-//         const end = new Date(start);
-//         end.setMonth(end.getMonth() + 1);
-
-//         where.date = {
-//           gte: start,
-//           lt: end
-//         };
-//       }
-//     }
-
-//     // 📅 YEAR FILTER
-//     if (period === 'year' && year) {
-//       const start = new Date(`${year}-01-01`);
-
-//       if (!isNaN(start.getTime())) {
-//         const end = new Date(`${Number(year) + 1}-01-01`);
-
-//         where.date = {
-//           gte: start,
-//           lt: end
-//         };
-//       }
-//     }
-
-//     // 🏷 CATEGORY FILTER
-//     if (categoryId && categoryId !== '') {
-//       const catId = parseInt(categoryId, 10);
-//       if (!isNaN(catId)) {
-//         where.categoryId = catId;
-//       }
-//     }
-
-//     const expenses = await prisma.expense.findMany({
-//       where,
-//       include: { category: true },
-//       orderBy: { date: 'desc' }
-//     });
-
-//     return NextResponse.json({ expenses });
-
-//   } catch (e) {
-//     console.error("API ERROR:", e);
-//     return NextResponse.json({ error: 'Server error' }, { status: 500 });
-//   }
-// }
-// ✅ SINGLE GET (Search + Filter combined)
+// ✅ GET EXPENSES MONTH-WISE
 export async function GET(req) {
   const user = await getUserFromRequest(req);
 
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
     const { searchParams } = new URL(req.url);
 
-    const search = searchParams.get('search') || searchParams.get('q');
-    const month = searchParams.get('month'); // 1-12 OR YYYY-MM
-    const year = searchParams.get('year');
-    const period = searchParams.get('period');
-    const categoryId = searchParams.get('categoryId');
+    const search = searchParams.get("search") || searchParams.get("q");
+    const month = searchParams.get("month");
+    const year = searchParams.get("year");
+    const period = searchParams.get("period");
 
-    let where = {
-      userId: user.id
+    const fromDate = searchParams.get("fromDate") || searchParams.get("from");
+    const toDate = searchParams.get("toDate") || searchParams.get("to");
+
+    const categoryId = searchParams.get("categoryId");
+    const categoryName = searchParams.get("category");
+    const min = searchParams.get("min");
+    const max = searchParams.get("max");
+
+    const where = {
+      userId: user.id,
     };
 
-    // 🔍 SEARCH
+    // 🔍 Search
     if (search) {
       where.OR = [
-        { description: { contains: search, mode: 'insensitive' } },
+        {
+          description: {
+            contains: search,
+          },
+        },
         {
           category: {
-            is: {
-              name: { contains: search, mode: 'insensitive' }
-            }
-          }
-        }
+            name: {
+              contains: search,
+            },
+          },
+        },
       ];
     }
 
-    // 📅 MONTH + YEAR FILTER
-    if (month && year) {
-      const m = Number(month); // April = 4
-      const y = Number(year);
+    // 📅 Date range
+    if (fromDate && toDate) {
+      const start = new Date(`${fromDate}T00:00:00.000Z`);
+      const end = new Date(`${toDate}T00:00:00.000Z`);
+      end.setUTCDate(end.getUTCDate() + 1);
 
-      if (!isNaN(m) && !isNaN(y) && m >= 1 && m <= 12) {
-        const start = new Date(y, m - 1, 1);
-        const end = new Date(y, m, 1);
-
-        where.date = {
-          gte: start,
-          lt: end
-        };
-      }
+      where.date = {
+        gte: start,
+        lt: end,
+      };
     }
 
-    // 📅 SUPPORT OLD FORMAT: month=2026-04
-    else if (month && month.includes('-')) {
-      const start = new Date(`${month}-01`);
+    // 📅 Only from date
+    else if (fromDate) {
+      const start = new Date(`${fromDate}T00:00:00.000Z`);
+      const end = new Date(start);
+      end.setUTCDate(end.getUTCDate() + 1);
 
-      if (!isNaN(start.getTime())) {
-        const end = new Date(start);
-        end.setMonth(end.getMonth() + 1);
-
-        where.date = {
-          gte: start,
-          lt: end
-        };
-      }
+      where.date = {
+        gte: start,
+        lt: end,
+      };
     }
 
-    // 📅 YEAR FILTER
-    else if (period === 'year' && year) {
+    // 📅 Month filter: 2026-05
+    else if (month && /^\d{4}-\d{2}$/.test(month)) {
+      const start = new Date(`${month}-01T00:00:00.000Z`);
+      const end = new Date(start);
+      end.setUTCMonth(end.getUTCMonth() + 1);
+
+      where.date = {
+        gte: start,
+        lt: end,
+      };
+    }
+
+    // 📅 Year filter
+    else if (period === "year" && year) {
       const y = Number(year);
 
       if (!isNaN(y)) {
-        const start = new Date(y, 0, 1);
-        const end = new Date(y + 1, 0, 1);
+        const start = new Date(`${y}-01-01T00:00:00.000Z`);
+        const end = new Date(`${y + 1}-01-01T00:00:00.000Z`);
 
         where.date = {
           gte: start,
-          lt: end
+          lt: end,
         };
       }
     }
 
-    // 🏷 CATEGORY FILTER
-    if (categoryId && categoryId !== '') {
-      const catId = parseInt(categoryId, 10);
-
+    // 🏷 Category by ID
+    if (categoryId && categoryId !== "all") {
+      const catId = Number(categoryId);
       if (!isNaN(catId)) {
         where.categoryId = catId;
       }
     }
 
+    // 🏷 Category by name
+    if (categoryName && categoryName !== "all") {
+      where.category = {
+        name: categoryName,
+      };
+    }
+
+    // 💰 Amount range
+    if (min || max) {
+      where.amount = {};
+
+      if (min) {
+        const minAmount = Number(min);
+        if (!isNaN(minAmount)) where.amount.gte = minAmount;
+      }
+
+      if (max) {
+        const maxAmount = Number(max);
+        if (!isNaN(maxAmount)) where.amount.lte = maxAmount;
+      }
+    }
+
     const expenses = await prisma.expense.findMany({
       where,
-      include: { category: true },
-      orderBy: { date: 'desc' }
+      include: {
+        category: true,
+      },
+      orderBy: {
+        date: "desc",
+      },
     });
 
     return NextResponse.json({ expenses });
-
   } catch (e) {
-    console.error("API ERROR:", e);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    console.error("EXPENSE GET ERROR:", e);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
-
 
 // ✅ CREATE EXPENSE
 export async function POST(req) {
   const user = await getUserFromRequest(req);
 
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
     const body = await req.json();
 
-    // Validate amount
     const amount = Number(body.amount);
+    const categoryId = Number(body.categoryId);
+
     if (isNaN(amount) || amount <= 0) {
-      return NextResponse.json({ error: 'Invalid amount' }, { status: 400 });
+      return NextResponse.json({ error: "Invalid amount" }, { status: 400 });
     }
 
-    // Validate categoryId
-    const categoryId = body.categoryId !== undefined ? Number(body.categoryId) : NaN;
     if (isNaN(categoryId)) {
-      return NextResponse.json({ error: 'Invalid or missing categoryId' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid category" },
+        { status: 400 }
+      );
     }
 
-    // Verify category exists and belongs to this user
-    const category = await prisma.category.findUnique({ where: { id: categoryId } });
+    const category = await prisma.category.findFirst({
+      where: {
+        id: categoryId,
+        userId: user.id,
+      },
+    });
+
     if (!category) {
-      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
-    }
-    if (category.userId !== user.id) {
-      return NextResponse.json({ error: 'Unauthorized to use this category' }, { status: 403 });
+      return NextResponse.json(
+        { error: "Category not found" },
+        { status: 404 }
+      );
     }
 
-    // Validate date
-    const date = body.date ? new Date(body.date) : new Date();
-    if (isNaN(date.getTime())) {
-      return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
+    const expenseDate = body.date
+      ? new Date(`${body.date}T00:00:00.000Z`)
+      : new Date();
+
+    if (isNaN(expenseDate.getTime())) {
+      return NextResponse.json(
+        { error: "Invalid date format. Use YYYY-MM-DD" },
+        { status: 400 }
+      );
     }
 
     const expense = await prisma.expense.create({
       data: {
         amount,
         categoryId,
-        description: body.description || '',
-        date,
-        userId: user.id
-      }
+        description: body.description || "",
+        date: expenseDate,
+        userId: user.id,
+      },
+      include: {
+        category: true,
+      },
     });
 
-    return NextResponse.json({ expense });
-
+    return NextResponse.json({ expense }, { status: 201 });
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    console.error("EXPENSE POST ERROR:", e);
+    return NextResponse.json(
+      { error: e.message || "Server error" },
+      { status: 500 }
+    );
   }
 }
-// delete expance 

@@ -1,126 +1,84 @@
-import prisma from '@/lib/prisma';
+import { NextResponse } from "next/server";
+import prisma from "../../../lib/prisma";
+import { getUserFromRequest } from "../../../lib/auth";
 
-// ✅ GET budgets month-wise
 export async function GET(req) {
+  const user = await getUserFromRequest(req);
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(req.url);
-
-    const userId = Number(searchParams.get('userId'));
-    const month =
-      searchParams.get('month') || new Date().toISOString().slice(0, 7);
-
-    if (!userId) {
-      return Response.json(
-        { error: 'userId is required' },
-        { status: 400 }
-      );
-    }
+    const month = searchParams.get("month") || new Date().toISOString().slice(0, 7);
 
     const budgets = await prisma.budget.findMany({
       where: {
-        userId,
-        month
+        userId: user.id,
+        month,
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        category: "asc",
+      },
     });
 
-    return Response.json({ budgets });
+    return NextResponse.json({ budgets });
   } catch (error) {
-    console.error('GET BUDGET ERROR:', error);
-    return Response.json(
-      { error: error.message || 'Server error' },
+    console.error("GET CATEGORY BUDGET ERROR:", error);
+    return NextResponse.json(
+      { error: error.message || "Server error" },
       { status: 500 }
     );
   }
 }
 
-// ✅ CREATE / UPDATE budget month-wise
 export async function POST(req) {
+  const user = await getUserFromRequest(req);
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
 
-    const userId = Number(body.userId);
     const category = body.category;
-    const amount = Number(body.amount);
+    const amount = Number(body.amount ?? body.monthlyBudget);
     const month = body.month || new Date().toISOString().slice(0, 7);
 
-    if (!userId) {
-      return Response.json(
-        { error: 'userId is required' },
-        { status: 400 }
-      );
-    }
-
     if (!category) {
-      return Response.json(
-        { error: 'category is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Category is required" }, { status: 400 });
     }
 
-    if (!amount || amount <= 0) {
-      return Response.json(
-        { error: 'amount is required' },
-        { status: 400 }
-      );
+    if (isNaN(amount) || amount <= 0) {
+      return NextResponse.json({ error: "Valid amount is required" }, { status: 400 });
     }
 
     const budget = await prisma.budget.upsert({
       where: {
         userId_category_month: {
-          userId,
+          userId: user.id,
           category,
-          month
-        }
+          month,
+        },
       },
       update: {
-        amount
+        amount,
       },
       create: {
-        userId,
+        userId: user.id,
         category,
         amount,
-        month
-      }
+        month,
+      },
     });
 
-    return Response.json({ budget });
+    return NextResponse.json({ budget });
   } catch (error) {
-    console.error('POST BUDGET ERROR:', error);
-    return Response.json(
-      { error: error.message || 'Server error' },
-      { status: 500 }
-    );
-  }
-}
-
-// ✅ DELETE budget
-export async function DELETE(req) {
-  try {
-    const { searchParams } = new URL(req.url);
-
-    const id = Number(searchParams.get('id'));
-
-    if (!id) {
-      return Response.json(
-        { error: 'Budget id is required' },
-        { status: 400 }
-      );
-    }
-
-    await prisma.budget.delete({
-      where: { id }
-    });
-
-    return Response.json({
-      message: 'Budget deleted successfully'
-    });
-  } catch (error) {
-    console.error('DELETE BUDGET ERROR:', error);
-    return Response.json(
-      { error: error.message || 'Server error' },
+    console.error("POST CATEGORY BUDGET ERROR:", error);
+    return NextResponse.json(
+      { error: error.message || "Server error" },
       { status: 500 }
     );
   }

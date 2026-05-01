@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/toast";
 
 const PREDEFINED_CATEGORIES = [
   { name: "Food", icon: "🍔" },
@@ -26,33 +27,34 @@ export default function BudgetManagementPage() {
   const [editAmount, setEditAmount] = useState("");
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
 
+  const toast = useToast();
+
   useEffect(() => {
     fetchBudgetsAndExpenses();
   }, [month]);
 
   async function fetchBudgetsAndExpenses() {
-    setLoading(true);
-
     try {
-      const budgetRes = await fetch("/api/category-budget", {
-        credentials: "include",
-      });
+      setLoading(true);
 
-      if (budgetRes.ok) {
-        const budgetData = await budgetRes.json();
-        setCategoryBudgets(budgetData.budgets || []);
-      }
+      const [budgetRes, expenseRes] = await Promise.all([
+        fetch(`/api/budgets?month=${month}`, {
+          credentials: "include",
+        }),
+        fetch(`/api/expenses?month=${month}`, {
+          credentials: "include",
+        }),
+      ]);
 
-      const expenseRes = await fetch(`/api/expenses?month=${month}`, {
-        credentials: "include",
-      });
+      const budgetData = await budgetRes.json();
+      const expenseData = await expenseRes.json();
 
-      if (expenseRes.ok) {
-        const expenseData = await expenseRes.json();
-        setExpenses(expenseData.expenses || []);
-      }
+      setCategoryBudgets(budgetData.budgets || []);
+      setExpenses(expenseData.expenses || []);
     } catch (err) {
-      console.error("Error fetching data:", err);
+      console.error("Budget fetch error:", err);
+      setCategoryBudgets([]);
+      setExpenses([]);
     } finally {
       setLoading(false);
     }
@@ -60,23 +62,22 @@ export default function BudgetManagementPage() {
 
   function getSpentByCategory(categoryName) {
     return expenses
-      .filter(
-        (e) =>
-          e.category?.name === categoryName ||
-          e.category === categoryName ||
-          e.categoryName === categoryName
-      )
+      .filter((e) => e.category?.name === categoryName)
       .reduce((sum, e) => sum + Number(e.amount || 0), 0);
   }
 
   async function saveBudget(categoryName, amount) {
     if (!amount || Number(amount) <= 0) {
-      alert("Please enter a valid amount");
+      toast.push({
+        title: "Validation",
+        message: "Please enter a valid amount",
+        type: "error",
+      });
       return;
     }
 
     try {
-      const res = await fetch("/api/category-budget", {
+      const res = await fetch("/api/budgets", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -84,24 +85,37 @@ export default function BudgetManagementPage() {
         credentials: "include",
         body: JSON.stringify({
           category: categoryName,
-          monthlyBudget: Number(amount),
+          amount: Number(amount),
+          month,
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || "Failed to save budget");
+        toast.push({
+          title: "Error",
+          message: data.error || "Failed to save budget",
+          type: "error",
+        });
         return;
       }
 
-      alert("Budget saved successfully!");
+      toast.push({
+        title: "Budget saved",
+        message: `Budget set for ${categoryName} in ${month}`,
+        type: "info",
+      });
+
       setEditingId(null);
       setEditAmount("");
       fetchBudgetsAndExpenses();
     } catch (err) {
-      console.error("Error saving budget:", err);
-      alert("Server error");
+      toast.push({
+        title: "Server error",
+        message: "Failed saving budget",
+        type: "error",
+      });
     }
   }
 
@@ -110,7 +124,7 @@ export default function BudgetManagementPage() {
 
     try {
       const res = await fetch(
-        `/api/category-budget/${encodeURIComponent(categoryName)}`,
+        `/api/budgets/${encodeURIComponent(categoryName)}?month=${month}`,
         {
           method: "DELETE",
           credentials: "include",
@@ -120,15 +134,27 @@ export default function BudgetManagementPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || "Failed to delete budget");
+        toast.push({
+          title: "Error",
+          message: data.error || "Failed to delete budget",
+          type: "error",
+        });
         return;
       }
 
-      alert("Budget deleted");
+      toast.push({
+        title: "Budget deleted",
+        message: `Budget for ${categoryName} removed from ${month}`,
+        type: "info",
+      });
+
       fetchBudgetsAndExpenses();
     } catch (err) {
-      console.error("Error deleting budget:", err);
-      alert("Server error");
+      toast.push({
+        title: "Server error",
+        message: "Failed deleting budget",
+        type: "error",
+      });
     }
   }
 
@@ -153,7 +179,7 @@ export default function BudgetManagementPage() {
             💰 Budget Management
           </h1>
           <p className="text-muted mt-2">
-            Set category limits and track spending
+            Set category limits and track spending month-wise
           </p>
         </div>
 
@@ -232,9 +258,7 @@ export default function BudgetManagementPage() {
                               ? "bg-yellow-500"
                               : "bg-green-600"
                           }`}
-                          style={{
-                            width: `${Math.min(percentage, 100)}%`,
-                          }}
+                          style={{ width: `${Math.min(percentage, 100)}%` }}
                         />
                       </div>
 
@@ -247,8 +271,7 @@ export default function BudgetManagementPage() {
 
                       {isExceeded && (
                         <div className="p-3 bg-red-100 border border-red-300 text-red-700 rounded-lg text-sm font-semibold">
-                          ❌ Budget exceeded by ₹
-                          {(spent - budget).toFixed(2)}
+                          ❌ Budget exceeded by ₹{(spent - budget).toFixed(2)}
                         </div>
                       )}
 
@@ -328,7 +351,7 @@ export default function BudgetManagementPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>📊 Summary</CardTitle>
+            <CardTitle>📊 Summary for {month}</CardTitle>
           </CardHeader>
 
           <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4">

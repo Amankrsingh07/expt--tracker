@@ -1,16 +1,17 @@
- 'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useEffect, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/toast";
 
 export default function ExpenseForm({ onSuccess }) {
+  const toast = useToast();
+
   const [form, setForm] = useState({
-    amount: '',
-    category: '',
-    newCategory: '',
-    type: 'expense',
-    date: new Date().toISOString().slice(0,10)
+    amount: "",
+    category: "",
+    newCategory: "",
+    date: new Date().toISOString().slice(0, 10),
   });
 
   const [categories, setCategories] = useState([]);
@@ -18,79 +19,106 @@ export default function ExpenseForm({ onSuccess }) {
   const [budgetWarning, setBudgetWarning] = useState(null);
   const [categoryBudgetInfo, setCategoryBudgetInfo] = useState(null);
 
-  const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value
-    });
-    setBudgetWarning(null); // Clear warning on change
-  };
-
-  // Load categories on mount
   useEffect(() => {
-    let mounted = true;
-    async function loadCategories() {
-      try {
-        const res = await fetch('/api/categories', { credentials: 'include' });
-        if (!res.ok) return setCategories([]);
-        const json = await res.json();
-        if (mounted) setCategories(json.categories || []);
-      } catch (err) {
-        console.error('Failed to load categories', err);
-        if (mounted) setCategories([]);
-      }
-    }
-
     loadCategories();
-    return () => { mounted = false; };
   }, []);
 
-          
-  const checkCategoryBudget = async (amount, categoryId) => {
-    if (!amount || !categoryId || form.type === 'income') {
+  async function loadCategories() {
+    try {
+      const res = await fetch("/api/categories", {
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        setCategories([]);
+        return;
+      }
+
+      const data = await res.json();
+      setCategories(data.categories || []);
+    } catch (err) {
+      console.error("Failed to load categories:", err);
+      setCategories([]);
+    }
+  }
+
+  function handleChange(e) {
+    const updatedForm = {
+      ...form,
+      [e.target.name]: e.target.value,
+    };
+
+    setForm(updatedForm);
+    setBudgetWarning(null);
+
+    if (
+      updatedForm.amount &&
+      updatedForm.category &&
+      !isNaN(Number(updatedForm.category))
+    ) {
+      checkCategoryBudget(
+        Number(updatedForm.amount),
+        Number(updatedForm.category),
+        updatedForm.date
+      );
+    }
+  }
+
+  async function checkCategoryBudget(amount, categoryId, selectedDate) {
+    if (!amount || !categoryId || !selectedDate) {
       setCategoryBudgetInfo(null);
       setBudgetWarning(null);
       return;
     }
 
     try {
-      const month = (form.date || new Date().toISOString()).slice(0, 7);
-      
-      // Fetch category budgets
-      const budgetRes = await fetch('/api/category-budget', {
-        credentials: 'include'
+      const month = selectedDate.slice(0, 7);
+
+      const categoryName =
+        categories.find((c) => Number(c.id) === Number(categoryId))?.name ||
+        "";
+
+      if (!categoryName) {
+        setCategoryBudgetInfo(null);
+        setBudgetWarning(null);
+        return;
+      }
+
+      const budgetRes = await fetch(`/api/category-budget?month=${month}`, {
+        credentials: "include",
       });
-      
+
       if (!budgetRes.ok) return;
-      
+
       const budgetData = await budgetRes.json();
       const categoryBudgets = budgetData.budgets || [];
-      
-      // Find budget for this category
-      const categoryBudget = categoryBudgets.find(b => b.categoryId === categoryId);
+
+      // ✅ Your Budget schema uses category string, not categoryId
+      const categoryBudget = categoryBudgets.find(
+        (b) => b.category === categoryName && b.month === month
+      );
+
       if (!categoryBudget) {
         setCategoryBudgetInfo(null);
         setBudgetWarning(null);
         return;
       }
 
-      // Fetch expenses for this category this month
       const expenseRes = await fetch(`/api/expenses?month=${month}`, {
-        credentials: 'include'
+        credentials: "include",
       });
-      
+
       if (!expenseRes.ok) return;
-      
+
       const expenseData = await expenseRes.json();
       const expenses = expenseData.expenses || [];
-      
-      const categoryName = categories.find(c => c.id === categoryId)?.name;
+
       const spent = expenses
-        .filter(e => e.categoryId === categoryId)
+        .filter((e) => Number(e.categoryId) === Number(categoryId))
         .reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
+      const budget = Number(categoryBudget.amount || 0);
       const newSpent = spent + Number(amount);
-      const budget = categoryBudget.monthlyBudget;
       const remaining = budget - spent;
       const isExceeded = newSpent > budget;
 
@@ -100,103 +128,130 @@ export default function ExpenseForm({ onSuccess }) {
         remaining,
         newSpent,
         isExceeded,
-        categoryName
+        categoryName,
       };
 
       setCategoryBudgetInfo(info);
 
-      // Set warning or error based on newSpent
       if (isExceeded) {
         setBudgetWarning({
-          type: 'error',
-          message: `❌ BUDGET LIMIT REACHED: No remaining budget for ${categoryName} this month.`
+          type: "error",
+          message: `❌ Budget limit exceeded for ${categoryName}.`,
         });
       } else if (newSpent > budget * 0.8) {
         setBudgetWarning({
-          type: 'warning',
-          message: `⚠️ WARNING: You're approaching ${categoryName} budget limit. ${remaining > 0 ? `Only ₹${remaining.toFixed(2)} remaining.` : 'Budget already exceeded!'}`
+          type: "warning",
+          message: `⚠️ You are near your ${categoryName} budget limit. Remaining ₹${remaining.toFixed(
+            2
+          )}`,
         });
       } else {
         setBudgetWarning(null);
       }
     } catch (err) {
-      console.error('Error checking budget:', err);
+      console.error("Error checking budget:", err);
     }
-  };
+  }
 
-  const handleSubmit = async (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
-    setLoading(true);
+
+    if (!form.amount || !form.category || !form.date) {
+      toast.push({
+        title: "Validation",
+        message: "Please fill all fields",
+        type: "error",
+      });
+      return;
+    }
+
+    if (budgetWarning?.type === "error") {
+      toast.push({
+        title: "Budget exceeded",
+        message: "Cannot add expense because category budget exceeded.",
+        type: "error",
+      });
+      return;
+    }
 
     try {
-      // prepare payload expected by our API
+      setLoading(true);
+
       const payload = {
         amount: Number(form.amount),
-        description: '',
-        date: form.date || new Date().toISOString(),
+        description: "",
+        date: form.date || new Date().toISOString().slice(0, 10),
       };
 
-      // if categories available and user selected one by id, send categoryId
-      if (form.category && !isNaN(Number(form.category))) {
-        payload.categoryId = Number(form.category);
-      } else if (form.category === '__new' && form.newCategory) {
-        // create new category and register it locally so select shows it
-        try {
-          const cRes = await fetch('/api/categories', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ name: form.newCategory })
+      if (form.category === "__new") {
+        if (!form.newCategory.trim()) {
+          toast.push({
+            title: "Validation",
+            message: "Please enter new category name",
+            type: "error",
           });
-          if (cRes.ok) {
-            const cj = await cRes.json();
-            payload.categoryId = cj.category.id;
-            // add to local categories and set form to new id so the select displays it
-            setCategories((prev) => [...prev, cj.category]);
-            setForm((f) => ({ ...f, category: String(cj.category.id), newCategory: '' }));
-          }
-        } catch (e) {
-          // ignore category creation error
+          setLoading(false);
+          return;
         }
-      } else if (form.category) {
-        // try to find matching category by name (fallback)
-        const match = categories.find(c => c.name.toLowerCase() === form.category.toLowerCase());
-        if (match) payload.categoryId = match.id;
-      }
 
-      // --- Budget pre-check: Check if category budget will be exceeded ---
-      // Client-side guard: ensure categoryId exists for expenses
-      if (form.type === 'expense' && (!payload.categoryId || isNaN(Number(payload.categoryId)))) {
-        alert('Please select or create a valid category before adding an expense.');
-        setLoading(false);
-        return;
-      }
-
-      if (form.type === 'expense' && payload.categoryId && categoryBudgetInfo?.isExceeded) {
-        const confirmText = `🚨 BUDGET EXCEEDED!\n\nThis expense will exceed the budget:\n- Category: ${categoryBudgetInfo.categoryName}\n- Budget: ₹${categoryBudgetInfo.budget}\n- Already Spent: ₹${categoryBudgetInfo.spent.toFixed(2)}\n- Will Exceed By: ₹${(categoryBudgetInfo.newSpent - categoryBudgetInfo.budget).toFixed(2)}\n\nYou cannot add this expense. Please reduce the amount.`;
-        alert(confirmText);
-        setLoading(false);
-        return;
-      }
-
-      // Check remaining monthly budget
-      try {
-        const month = (form.date || new Date().toISOString()).slice(0, 7);
-        const sRes = await fetch(`/api/dashboard/summary?month=${month}`, {
-          credentials: 'include'
+        const cRes = await fetch("/api/categories", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            name: form.newCategory.trim(),
+          }),
         });
 
-        if (sRes.ok) {
-          const summary = await sRes.json();
-          const monthlyLimit = summary?.budget?.monthlyLimit || 0;
-          const spent = summary?.budget?.spent || 0;
+        const cData = await cRes.json();
+
+        if (!cRes.ok) {
+          throw new Error(cData.error || "Category create failed");
+        }
+
+        payload.categoryId = cData.category.id;
+      } else {
+        payload.categoryId = Number(form.category);
+      }
+
+      if (!payload.categoryId || isNaN(Number(payload.categoryId))) {
+        toast.push({
+          title: "Invalid category",
+          message: "Please select or create a valid category.",
+          type: "error",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // ✅ Monthly budget pre-check using selected date/month
+      try {
+        const month = payload.date.slice(0, 7);
+
+        const summaryRes = await fetch(`/api/dashboard/summary?month=${month}`, {
+          credentials: "include",
+        });
+
+        if (summaryRes.ok) {
+          const summary = await summaryRes.json();
+
+          const monthlyLimit = Number(summary?.budget?.monthlyLimit || 0);
+          const spent = Number(summary?.budget?.spent || 0);
           const newSpent = spent + Number(payload.amount || 0);
 
           if (monthlyLimit > 0 && newSpent > monthlyLimit) {
             const remaining = monthlyLimit - spent;
+
             const proceed = window.confirm(
-              `⚠️ Monthly Budget Warning:\nYou'll exceed monthly limit by ₹${(newSpent - monthlyLimit).toFixed(2)}.\nRemaining: ₹${remaining.toFixed(2)}\n\nContinue anyway?`
+              `⚠️ Monthly Budget Warning:\nYou will exceed monthly limit by ₹${(
+                newSpent - monthlyLimit
+              ).toFixed(2)}.\nRemaining: ₹${remaining.toFixed(
+                2
+              )}\n\nContinue anyway?`
             );
+
             if (!proceed) {
               setLoading(false);
               return;
@@ -204,230 +259,215 @@ export default function ExpenseForm({ onSuccess }) {
           }
         }
       } catch (err) {
-        console.error('Budget pre-check failed:', err);
+        console.error("Budget pre-check failed:", err);
       }
 
-      const res = await fetch('/api/expenses', {
-        method: 'POST',
+      const res = await fetch("/api/expenses", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json'
+          "Content-Type": "application/json",
         },
-        credentials: 'include',
-        body: JSON.stringify(payload)
+        credentials: "include",
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
 
-      if (res.ok) {
-        alert('✅ Expense Added Successfully!');
-        setForm({
-          amount: '',
-          category: '',
-          newCategory: '',
-          type: 'expense',
-          date: new Date().toISOString().slice(0, 10)
-        });
-        setBudgetWarning(null);
-        setCategoryBudgetInfo(null);
-        onSuccess(); // redirect
-      } else {
-        alert(data.message || 'Error adding expense');
+      if (!res.ok) {
+        throw new Error(data.error || data.message || "Error adding expense");
       }
 
+      toast.push({
+        title: "Expense added",
+        message: "Expense added successfully",
+        type: "info",
+      });
+
+      try {
+        const catName =
+          categories.find((c) => Number(c.id) === Number(payload.categoryId))
+            ?.name || "category";
+
+        fetch("/api/notifications", {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: "Expense added",
+            body: `₹${payload.amount} in ${catName}`,
+          }),
+        });
+      } catch {}
+
+      setForm({
+        amount: "",
+        category: "",
+        newCategory: "",
+        date: new Date().toISOString().slice(0, 10),
+      });
+
+      setBudgetWarning(null);
+      setCategoryBudgetInfo(null);
+
+      onSuccess?.();
     } catch (error) {
       console.error(error);
-      alert('Server error');
-    }
 
-    setLoading(false);
-  };
+      toast.push({
+        title: "Error",
+        message: error.message || "Unexpected server error",
+        type: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-  <div className="max-w-xl mx-auto">
-
-    <div className="card space-y-6">
-
-      {/* 🔝 Title */}
-      <div>
-        <h2 className="text-xl font-semibold">Add Transaction</h2>
-        <p className="text-sm text-muted">Track your income or expenses easily</p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-5">
-
-        {/* 💰 Amount */}
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Amount</label>
-          <Input
-            type="number"
-            name="amount"
-            placeholder="₹ 0.00"
-            value={form.amount}
-            onChange={(e) => {
-              handleChange(e);
-              // Check budget when amount changes
-              if (form.category && !isNaN(Number(form.category)) && form.type === 'expense') {
-                checkCategoryBudget(Number(e.target.value), Number(form.category));
-              }
-            }}
-            required
-          />
+    <div className="max-w-xl mx-auto">
+      <div className="card space-y-6">
+        <div>
+          <h2 className="text-xl font-semibold">Add Expense</h2>
+          <p className="text-sm text-muted">
+            Track your expense month-wise
+          </p>
         </div>
 
-        {/* 📂 Category */}
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Category</label>
-
-          {categories.length > 0 ? (
-            <>
-              <select
-                name="category"
-                value={form.category}
-                onChange={(e) => {
-                  handleChange(e);
-                  // Check budget when category changes
-                  if (form.amount && form.type === 'expense' && !isNaN(Number(e.target.value))) {
-                    checkCategoryBudget(Number(form.amount), Number(e.target.value));
-                  } else {
-                    setCategoryBudgetInfo(null);
-                    setBudgetWarning(null);
-                  }
-                }}
-                className="w-full p-2 h-10 rounded-lg bg-white text-black dark:bg-slate-800 dark:text-white border border-gray-300 dark:border-slate-600"
-                required
-              >
-                <option value="">Select category</option>
-                {categories.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-                <option value="__new">+ Create new</option>
-              </select>
-
-              {form.category === '__new' && (
-                <Input
-                  type="text"
-                  name="newCategory"
-                  placeholder="New category name"
-                  value={form.newCategory}
-                  onChange={handleChange}
-                  className="mt-2"
-                  required
-                />
-              )}
-            </>
-          ) : (
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Amount</label>
             <Input
-              type="text"
-              name="category"
-              placeholder="Food, Travel..."
-              value={form.category}
+              type="number"
+              name="amount"
+              placeholder="₹ 0.00"
+              value={form.amount}
               onChange={handleChange}
               required
             />
-          )}
-        </div>
-
-        {/* 🔁 Type */}
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Type</label>
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setForm(f => ({ ...f, type: 'expense' }));
-                setBudgetWarning(null);
-                // Recheck budget if changing to expense
-                if (form.amount && form.category && !isNaN(Number(form.category))) {
-                  checkCategoryBudget(Number(form.amount), Number(form.category));
-                }
-              }}
-              className={`flex-1 py-2 rounded-xl border ${
-                form.type === 'expense'
-                  ? 'bg-red-100 text-red-600 border-red-300'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-800'
-              }`}
-            >
-              Expense
-            </button>
-
-            {/* <button
-              type="button"
-              onClick={() => {
-                setForm(f => ({ ...f, type: 'income' }));
-                setBudgetWarning(null);
-                setCategoryBudgetInfo(null);
-              }}
-              className={`flex-1 py-2 rounded-xl border ${
-                form.type === 'income'
-                  ? 'bg-green-100 text-green-600 border-green-300'
-                  : 'hover:bg-gray-100 dark:hover:bg-gray-800'
-              }`}
-            >
-              Income
-            </button> */}
           </div>
-        </div>
 
-        {/* 📅 Date */}
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Date</label>
-          <Input
-            type="date"
-            name="date"
-            value={form.date}
-            onChange={handleChange}
-            required
-          />
-        </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Category</label>
 
-        {/* 📊 Category Budget Info */}
-        {categoryBudgetInfo && form.type === 'expense' && (
-          <div className={`p-3 rounded-lg border ${
-            categoryBudgetInfo.isExceeded 
-              ? 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700' 
-              : 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700'
-          }`}>
-            <p className="text-sm font-semibold mb-2">
-              {categoryBudgetInfo.categoryName} Budget Info:
-            </p>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>Budget: <span className="font-bold">₹{categoryBudgetInfo.budget}</span></div>
-              <div>Spent: <span className="font-bold">₹{categoryBudgetInfo.spent.toFixed(2)}</span></div>
-              <div>Remaining: <span className="font-bold">₹{categoryBudgetInfo.remaining.toFixed(2)}</span></div>
-              <div>After This: <span className="font-bold">₹{categoryBudgetInfo.newSpent.toFixed(2)}</span></div>
+            <select
+              name="category"
+              value={form.category}
+              onChange={handleChange}
+              className="w-full p-2 h-10 rounded-lg bg-white text-black dark:bg-slate-800 dark:text-white border border-gray-300 dark:border-slate-600"
+              required
+            >
+              <option value="">Select category</option>
+
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+
+              <option value="__new">+ Create new</option>
+            </select>
+
+            {form.category === "__new" && (
+              <Input
+                type="text"
+                name="newCategory"
+                placeholder="New category name"
+                value={form.newCategory}
+                onChange={handleChange}
+                className="mt-2"
+                required
+              />
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Date</label>
+            <Input
+              type="date"
+              name="date"
+              value={form.date}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          {categoryBudgetInfo && (
+            <div
+              className={`p-3 rounded-lg border ${
+                categoryBudgetInfo.isExceeded
+                  ? "bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-700"
+                  : "bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700"
+              }`}
+            >
+              <p className="text-sm font-semibold mb-2">
+                {categoryBudgetInfo.categoryName} Budget Info:
+              </p>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  Budget:{" "}
+                  <span className="font-bold">
+                    ₹{categoryBudgetInfo.budget.toFixed(2)}
+                  </span>
+                </div>
+
+                <div>
+                  Spent:{" "}
+                  <span className="font-bold">
+                    ₹{categoryBudgetInfo.spent.toFixed(2)}
+                  </span>
+                </div>
+
+                <div>
+                  Remaining:{" "}
+                  <span className="font-bold">
+                    ₹{categoryBudgetInfo.remaining.toFixed(2)}
+                  </span>
+                </div>
+
+                <div>
+                  After This:{" "}
+                  <span className="font-bold">
+                    ₹{categoryBudgetInfo.newSpent.toFixed(2)}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ⚠️ Budget Warning */}
-        {budgetWarning && (
-          <div className={`p-3 rounded-lg border font-semibold text-sm ${
-            budgetWarning.type === 'error'
-              ? 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-700 dark:text-red-300'
-              : 'bg-yellow-100 dark:bg-yellow-900/30 border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300'
-          }`}>
-            {budgetWarning.message}
-          </div>
-        )}
+          {budgetWarning && (
+            <div
+              className={`p-3 rounded-lg border font-semibold text-sm ${
+                budgetWarning.type === "error"
+                  ? "bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-700 dark:text-red-300"
+                  : "bg-yellow-100 dark:bg-yellow-900/30 border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-300"
+              }`}
+            >
+              {budgetWarning.message}
+            </div>
+          )}
 
-        {/* 🚀 Submit */}
-        <button
-          type="submit"
-          disabled={loading || (form.type === 'expense' && budgetWarning?.type === 'error')}
-          className={`w-full btn btn-primary ${(form.type === 'expense' && budgetWarning?.type === 'error') ? 'opacity-50 cursor-not-allowed' : ''}`}
-        >
-          {loading ? 'Adding...' : 'Add Transaction'}
-        </button>
-        {form.type === 'expense' && budgetWarning?.type === 'error' && (
-          <p className="text-xs text-red-600 dark:text-red-400 text-center">
-            ❌ Cannot submit: Budget limit exceeded for this category
-          </p>
-        )}
+          <button
+            type="submit"
+            disabled={loading || budgetWarning?.type === "error"}
+            className={`w-full btn btn-primary ${
+              budgetWarning?.type === "error"
+                ? "opacity-50 cursor-not-allowed"
+                : ""
+            }`}
+          >
+            {loading ? "Adding..." : "Add Expense"}
+          </button>
 
-      </form>
-
+          {budgetWarning?.type === "error" && (
+            <p className="text-xs text-red-600 dark:text-red-400 text-center">
+              ❌ Cannot submit: Budget limit exceeded for this category
+            </p>
+          )}
+        </form>
+      </div>
     </div>
-
-  </div>
-);
+  );
 }

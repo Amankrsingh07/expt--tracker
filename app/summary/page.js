@@ -1,47 +1,59 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback } from 'react';
-import Layout from '@/components/Layout';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useState, useCallback } from "react";
+import Layout from "@/components/Layout";
+import { useRouter } from "next/navigation";
 
 function formatCurrency(value) {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR'
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
   }).format(Number(value || 0));
+}
+
+function getCurrentMonth() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
 }
 
 export default function FinancialSummaryPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+
+  // ✅ Summary page selected month/year
+  const [month, setMonth] = useState(getCurrentMonth());
 
   const fetchData = useCallback(async () => {
-    setLoading(true);
-
     try {
-      const userRes = await fetch('/api/auth/me', {
-        credentials: 'include'
+      setLoading(true);
+
+      const userRes = await fetch("/api/auth/me", {
+        credentials: "include",
       });
 
       if (!userRes.ok) {
-        router.push('/login');
+        router.push("/login");
         return;
       }
 
       const res = await fetch(`/api/dashboard/summary?month=${month}`, {
-        credentials: 'include'
+        credentials: "include",
       });
 
-      if (res.ok) {
-        const json = await res.json();
-        setData(json);
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(json.error || "Failed to fetch summary");
       }
+
+      setData(json);
     } catch (error) {
-      console.error('Summary Error:', error);
+      console.error("Summary Error:", error);
+      setData(null);
     } finally {
       setLoading(false);
     }
@@ -49,28 +61,12 @@ export default function FinancialSummaryPage() {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData, searchParams?.get?.('refresh')]);
-
-  useEffect(() => {
-    const id = setInterval(fetchData, 15000);
-    return () => clearInterval(id);
-  }, [fetchData]);
-
-  useEffect(() => {
-    function handleVisibility() {
-      if (document.visibilityState === 'visible') {
-        fetchData();
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [fetchData]);
 
   if (loading) {
     return (
       <Layout>
-        <div className="text-center py-10">Loading...</div>
+        <div className="text-center py-10">Loading summary...</div>
       </Layout>
     );
   }
@@ -78,21 +74,15 @@ export default function FinancialSummaryPage() {
   if (!data) {
     return (
       <Layout>
-        <div className="text-center py-10">No data</div>
+        <div className="text-center py-10">No summary data found</div>
       </Layout>
     );
   }
 
   const { income, expenses, budget, savings } = data;
-
   const categoryBudgets = budget?.categoryBudgets || {};
 
-  // ✅ Correct budget calculation
-  const monthlyLimit = Object.values(categoryBudgets).reduce(
-    (sum, item) => sum + Number(item.allocated || 0),
-    0
-  );
-
+  const monthlyLimit = Number(budget?.monthlyLimit || 0);
   const spent = Number(expenses?.total || 0);
   const remaining = monthlyLimit - spent;
   const percentUsed =
@@ -101,8 +91,14 @@ export default function FinancialSummaryPage() {
   return (
     <Layout>
       <div className="space-y-8">
-        <div className="flex justify-between items-center">
-          <h1 className="text-4xl font-bold">💼 Financial Summary</h1>
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-bold">💼 Financial Summary</h1>
+            <p className="text-gray-500 mt-2">
+              Showing only selected month data: {month}
+            </p>
+          </div>
 
           <input
             type="month"
@@ -112,6 +108,7 @@ export default function FinancialSummaryPage() {
           />
         </div>
 
+        {/* Metric Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <MetricCard
             title="Total Income"
@@ -146,22 +143,29 @@ export default function FinancialSummaryPage() {
           />
         </div>
 
+        {/* Income + Budget */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-surface rounded-lg shadow-lg p-6">
             <h2 className="text-2xl font-bold mb-4">📈 Income Breakdown</h2>
 
             <div className="space-y-3">
-              {Object.entries(income.bySource || {}).map(([source, amount]) => (
-                <div
-                  key={source}
-                  className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900 rounded-lg"
-                >
-                  <span className="font-semibold">{source}</span>
-                  <span className="text-lg font-bold text-green-600 dark:text-green-300">
-                    {formatCurrency(amount)}
-                  </span>
-                </div>
-              ))}
+              {Object.keys(income.bySource || {}).length === 0 ? (
+                <p className="text-gray-500">No income found for this month.</p>
+              ) : (
+                Object.entries(income.bySource || {}).map(
+                  ([source, amount]) => (
+                    <div
+                      key={source}
+                      className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-900 rounded-lg"
+                    >
+                      <span className="font-semibold">{source}</span>
+                      <span className="text-lg font-bold text-green-600 dark:text-green-300">
+                        {formatCurrency(amount)}
+                      </span>
+                    </div>
+                  )
+                )
+              )}
             </div>
           </div>
 
@@ -181,10 +185,10 @@ export default function FinancialSummaryPage() {
                   <div
                     className={`h-4 rounded-full transition-all ${
                       percentUsed > 100
-                        ? 'bg-red-500'
+                        ? "bg-red-500"
                         : percentUsed > 80
-                        ? 'bg-yellow-500'
-                        : 'bg-green-500'
+                        ? "bg-yellow-500"
+                        : "bg-green-500"
                     }`}
                     style={{ width: `${Math.min(percentUsed, 100)}%` }}
                   />
@@ -198,8 +202,11 @@ export default function FinancialSummaryPage() {
           </div>
         </div>
 
+        {/* Category Budget */}
         <div className="bg-surface rounded-lg shadow-lg p-6">
-          <h2 className="text-2xl font-bold mb-4">🏷️ Category-Wise Breakdown</h2>
+          <h2 className="text-2xl font-bold mb-4">
+            🏷️ Category-Wise Breakdown
+          </h2>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -228,7 +235,7 @@ export default function FinancialSummaryPage() {
 
                     <td
                       className={`text-right p-3 font-semibold ${
-                        item.remaining >= 0 ? 'text-green-600' : 'text-red-600'
+                        item.remaining >= 0 ? "text-green-600" : "text-red-600"
                       }`}
                     >
                       {formatCurrency(item.remaining)}
@@ -238,10 +245,10 @@ export default function FinancialSummaryPage() {
                       <span
                         className={`px-2 py-1 rounded text-xs font-bold ${
                           item.percentUsed > 100
-                            ? 'bg-red-100 text-red-700'
+                            ? "bg-red-100 text-red-700"
                             : item.percentUsed > 80
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-green-100 text-green-700'
+                            ? "bg-yellow-100 text-yellow-700"
+                            : "bg-green-100 text-green-700"
                         }`}
                       >
                         {item.percentUsed}%
@@ -253,7 +260,7 @@ export default function FinancialSummaryPage() {
                 {Object.keys(categoryBudgets).length === 0 && (
                   <tr>
                     <td colSpan="5" className="text-center p-6 text-gray-500">
-                      No budget set for this month
+                      No budget set for this selected month
                     </td>
                   </tr>
                 )}
@@ -262,6 +269,7 @@ export default function FinancialSummaryPage() {
           </div>
         </div>
 
+        {/* Recent Expenses */}
         {expenses.count > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
             <h2 className="text-2xl font-bold mb-4">📝 Recent Expenses</h2>
@@ -280,10 +288,10 @@ export default function FinancialSummaryPage() {
                         >
                           <div>
                             <p className="font-medium">
-                              {exp.description || 'No description'}
+                              {exp.description || "No description"}
                             </p>
                             <p className="text-xs text-gray-500">
-                              {new Date(exp.date).toLocaleDateString()}
+                              {new Date(exp.date).toLocaleDateString("en-IN")}
                             </p>
                           </div>
 
@@ -307,13 +315,13 @@ export default function FinancialSummaryPage() {
 function MetricCard({ title, value, subtitle, icon, color }) {
   const colors = {
     green:
-      'bg-green-50 dark:bg-green-900 border-green-500 text-green-600 dark:text-green-300',
+      "bg-green-50 dark:bg-green-900 border-green-500 text-green-600 dark:text-green-300",
     red:
-      'bg-red-50 dark:bg-red-900 border-red-500 text-red-600 dark:text-red-300',
+      "bg-red-50 dark:bg-red-900 border-red-500 text-red-600 dark:text-red-300",
     blue:
-      'bg-blue-50 dark:bg-blue-900 border-blue-500 text-blue-600 dark:text-blue-300',
+      "bg-blue-50 dark:bg-blue-900 border-blue-500 text-blue-600 dark:text-blue-300",
     purple:
-      'bg-purple-50 dark:bg-purple-900 border-purple-500 text-purple-600 dark:text-purple-300'
+      "bg-purple-50 dark:bg-purple-900 border-purple-500 text-purple-600 dark:text-purple-300",
   };
 
   return (
@@ -325,7 +333,7 @@ function MetricCard({ title, value, subtitle, icon, color }) {
           </p>
 
           <p className="text-2xl font-bold mt-1">
-            {typeof value === 'number' ? formatCurrency(value) : value}
+            {typeof value === "number" ? formatCurrency(value) : value}
           </p>
 
           <p className="text-xs text-gray-500 mt-1">{subtitle}</p>

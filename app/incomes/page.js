@@ -16,22 +16,22 @@ function formatCurrency(value) {
 export default function IncomesPage() {
   const [incomes, setIncomes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
 
   useEffect(() => {
     load();
-  }, []);
+  }, [month]);
 
   async function load() {
     try {
       setLoading(true);
 
-      const res = await fetch("/api/incomes", {
+      const res = await fetch(`/api/incomes?month=${month}`, {
         credentials: "include",
       });
 
       const data = await res.json();
-
-      setIncomes(Array.isArray(data) ? data : data.incomes || data.data || []);
+      setIncomes(data.incomes || []);
     } catch (err) {
       console.error("Income fetch error:", err);
       setIncomes([]);
@@ -48,7 +48,9 @@ export default function IncomesPage() {
       credentials: "include",
     });
 
-    if (res.ok) load();
+    if (res.ok) {
+      load();
+    }
   }
 
   const totalIncome = useMemo(() => {
@@ -68,15 +70,24 @@ export default function IncomesPage() {
             <div>
               <h1 className="text-3xl font-bold">💰 Income Dashboard</h1>
               <p className="text-white/90 mt-2">
-                Track your income sources and monthly earnings
+                Showing income records for {month}
               </p>
             </div>
 
-            <Link href="/add-income">
-              <Button className="bg-white text-green-700 hover:bg-gray-100 font-semibold">
-                + Add Income
-              </Button>
-            </Link>
+            <div className="flex gap-3 flex-wrap">
+              <input
+                type="month"
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                className="border rounded-lg px-4 py-2 bg-white text-black"
+              />
+
+              <Link href="/add-income">
+                <Button className="bg-white text-green-700 hover:bg-gray-100 font-semibold">
+                  + Add Income
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -108,7 +119,7 @@ export default function IncomesPage() {
             <div>
               <CardTitle className="text-2xl">Your Incomes</CardTitle>
               <p className="text-sm text-muted mt-1">
-                All your added income records
+                Only selected month data is shown
               </p>
             </div>
 
@@ -125,14 +136,14 @@ export default function IncomesPage() {
             ) : incomes.length === 0 ? (
               <div className="text-center py-16 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-dashed">
                 <div className="text-5xl mb-3">📭</div>
-                <h3 className="text-xl font-bold">No incomes yet</h3>
+                <h3 className="text-xl font-bold">No incomes this month</h3>
                 <p className="text-gray-500 mt-2">
-                  Add your salary, freelance income, or other sources.
+                  Add salary, freelance income, or other source.
                 </p>
 
                 <Link href="/add-income">
                   <Button className="mt-5 bg-green-600 hover:bg-green-700 text-white">
-                    Add First Income
+                    Add Income
                   </Button>
                 </Link>
               </div>
@@ -152,6 +163,7 @@ export default function IncomesPage() {
                         <h3 className="text-lg font-bold">
                           {income.source || "Other Income"}
                         </h3>
+
                         <p className="text-sm text-gray-500">
                           {income.date
                             ? new Date(income.date).toLocaleDateString("en-IN")
@@ -160,10 +172,16 @@ export default function IncomesPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
                       <p className="text-2xl font-bold text-green-600">
                         {formatCurrency(income.amount)}
                       </p>
+
+                      <Link href={`/incomes/${income.id}`}>
+                        <Button variant="outline" size="sm">
+                          View
+                        </Button>
+                      </Link>
 
                       <Button
                         variant="destructive"
@@ -186,9 +204,12 @@ export default function IncomesPage() {
 
 function SummaryCard({ title, value, icon, color }) {
   const colors = {
-    green: "bg-green-50 text-green-700 border-green-400 dark:bg-green-900 dark:text-green-200",
-    blue: "bg-blue-50 text-blue-700 border-blue-400 dark:bg-blue-900 dark:text-blue-200",
-    purple: "bg-purple-50 text-purple-700 border-purple-400 dark:bg-purple-900 dark:text-purple-200",
+    green:
+      "bg-green-50 text-green-700 border-green-400 dark:bg-green-900 dark:text-green-200",
+    blue:
+      "bg-blue-50 text-blue-700 border-blue-400 dark:bg-blue-900 dark:text-blue-200",
+    purple:
+      "bg-purple-50 text-purple-700 border-purple-400 dark:bg-purple-900 dark:text-purple-200",
   };
 
   return (

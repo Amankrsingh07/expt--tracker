@@ -1,14 +1,16 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import Layout from '@/components/Layout';
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Layout from "@/components/Layout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-
-function Money({ amount }) {
-  return <span>₹{Number(amount).toFixed(2)}</span>;
+function formatCurrency(value) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+  }).format(Number(value) || 0);
 }
 
 export default function ExpenseDetailPage() {
@@ -19,147 +21,114 @@ export default function ExpenseDetailPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch(`/api/expenses/${id}`, {
-          credentials: 'include'
-        });
-
-        const json = await res.json();
-
-        if (!res.ok) {
-          alert(json.error || 'Failed to load');
-          return;
-        }
-
-        setExpense(json.expense);
-      } catch (e) {
-        console.error(e);
-        alert('Error loading expense');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    if (id) load();
+    if (id) loadExpense();
   }, [id]);
 
-  async function handleDelete() {
-    if (!confirm('Delete this expense?')) return;
+  async function loadExpense() {
+    try {
+      setLoading(true);
 
-    const res = await fetch(`/api/expenses/${id}`, {
-      method: 'DELETE',
-      credentials: 'include'
-    });
+      const res = await fetch(`/api/expenses/${id}`, {
+        credentials: "include",
+      });
 
-    const json = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) {
-      alert(json.error || 'Delete failed');
-      return;
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch expense");
+      }
+
+      setExpense(data.expense);
+    } catch (err) {
+      console.error("Expense detail error:", err);
+      setExpense(null);
+    } finally {
+      setLoading(false);
     }
-
-    router.push('/expenses');
   }
 
-  /* 🔄 Loading UI */
+  async function deleteExpense() {
+    if (!confirm("Delete this expense?")) return;
+
+    const res = await fetch(`/api/expenses/${id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+
+    if (res.ok) {
+      router.push("/expenses");
+    }
+  }
+
   if (loading) {
     return (
       <Layout>
-        <div className="flex justify-center mt-20">
-          <div className="animate-pulse text-gray-500">
-            Loading expense...
-          </div>
-        </div>
+        <div className="text-center py-10">Loading expense...</div>
       </Layout>
     );
   }
 
-  /* ❌ Not found UI */
   if (!expense) {
     return (
       <Layout>
-        <div className="flex justify-center mt-20 text-gray-500">
-          Expense not found
-        </div>
+        <div className="text-center py-10">Expense not found</div>
       </Layout>
     );
   }
 
   return (
     <Layout>
-      <div className="flex justify-center mt-12 px-4">
+      <div className="max-w-2xl mx-auto space-y-6">
+        <h1 className="text-3xl font-bold">Expense Details</h1>
 
-        <Card className="w-full max-w-lg rounded-2xl border shadow-sm hover:shadow-lg transition-all duration-300">
-
-          {/* 🔝 Header */}
+        <Card>
           <CardHeader>
-            <CardTitle className="text-2xl font-semibold tracking-tight">
-              Expense Detail
+            <CardTitle>
+              {expense.category?.name || "No Category"}
             </CardTitle>
           </CardHeader>
 
-          {/* 📄 Content */}
-          <CardContent className="space-y-5">
+          <CardContent className="space-y-4">
+            <p>
+              <strong>Amount:</strong> {formatCurrency(expense.amount)}
+            </p>
 
-            {/* Info rows */}
-            <div className="space-y-3 text-sm">
+            <p>
+              <strong>Category:</strong>{" "}
+              {expense.category?.name || "No Category"}
+            </p>
 
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-gray-500">Date</span>
-                <span className="font-medium">
-                  {new Date(expense.date).toLocaleString()}
-                </span>
-              </div>
+            <p>
+              <strong>Description:</strong>{" "}
+              {expense.description || "No description"}
+            </p>
 
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-gray-500">Category</span>
-                <span className="font-medium">
-                  {expense.category?.name || '-'}
-                </span>
-              </div>
+            <p>
+              <strong>Date:</strong>{" "}
+              {expense.date
+                ? new Date(expense.date).toLocaleDateString("en-IN")
+                : "No date"}
+            </p>
 
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-gray-500">Amount</span>
-                <span className="font-bold text-indigo-600">
-                  <Money amount={expense.amount} />
-                </span>
-              </div>
+            <p>
+              <strong>ID:</strong> {expense.id}
+            </p>
 
-              <div className="flex justify-between">
-                <span className="text-gray-500">Description</span>
-                <span className="font-medium text-right max-w-[60%]">
-                  {expense.description || '-'}
-                </span>
-              </div>
-
-            </div>
-
-            {/* 🔘 Actions */}
-            <div className="flex justify-between pt-6">
-
-              <Button
-                variant="outline"
-                className="rounded-xl"
-                onClick={() => router.back()}
-              >
-                ← Back
+            <div className="flex gap-3 pt-4">
+              <Button onClick={() => router.push("/expenses")}>
+                Back
               </Button>
 
-              <Button
-                variant="destructive"
-                className="rounded-xl"
-                onClick={handleDelete}
-              >
+              <Button variant="outline" onClick={loadExpense}>
+                Refresh
+              </Button>
+
+              <Button variant="destructive" onClick={deleteExpense}>
                 Delete
               </Button>
-
             </div>
-
           </CardContent>
-
         </Card>
-
       </div>
     </Layout>
   );

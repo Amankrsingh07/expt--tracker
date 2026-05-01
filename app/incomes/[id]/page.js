@@ -18,21 +18,32 @@ export default function IncomeDetailPage() {
   const router = useRouter();
 
   const [income, setIncome] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (id) load();
+    if (id) loadIncome();
   }, [id]);
 
-  async function load() {
+  async function loadIncome() {
     try {
-      const res = await fetch(`/api/incomes/${id}`);
+      setLoading(true);
+
+      const res = await fetch(`/api/incomes/${id}`, {
+        credentials: "include",
+      });
+
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to fetch income");
+      }
 
-      setIncome(data);
+      setIncome(data.income || data);
     } catch (err) {
-      console.error(err);
+      console.error("Income detail error:", err);
+      setIncome(null);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -41,6 +52,7 @@ export default function IncomeDetailPage() {
 
     const res = await fetch(`/api/incomes/${id}`, {
       method: "DELETE",
+      credentials: "include",
     });
 
     if (res.ok) {
@@ -48,42 +60,86 @@ export default function IncomeDetailPage() {
     }
   }
 
+  if (loading) {
+    return (
+      <Layout>
+        <div className="text-center py-10">Loading income...</div>
+      </Layout>
+    );
+  }
+
   if (!income) {
     return (
       <Layout>
-        <p className="p-4">Loading...</p>
+        <div className="text-center py-10">Income not found</div>
       </Layout>
     );
   }
 
   return (
     <Layout>
-      <h1 className="text-2xl font-semibold mb-4">Income Details</h1>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{income.source}</CardTitle>
-        </CardHeader>
-
-        <CardContent className="space-y-2">
-          <p><strong>Amount:</strong> {formatCurrency(income.amount)}</p>
-          <p><strong>Date:</strong> {new Date(income.date).toLocaleDateString()}</p>
-          <p><strong>ID:</strong> {income.id}</p>
-
-          <div className="flex gap-2 mt-4">
-            <Button onClick={() => router.push("/incomes")}>
-              Back
-            </Button>
-
-            <Button
-              variant="destructive"
-              onClick={deleteIncome}
-            >
-              Delete
-            </Button>
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Income Details</h1>
+            <p className="text-sm text-muted mt-1">
+              View and manage this income record
+            </p>
           </div>
-        </CardContent>
-      </Card>
+
+          <Button variant="outline" onClick={() => router.push("/incomes")}>
+            ← Back
+          </Button>
+        </div>
+
+        <Card className="rounded-2xl shadow-lg">
+          <CardHeader className="bg-green-50 dark:bg-green-900/30 rounded-t-2xl">
+            <CardTitle className="text-2xl">
+              {income.source || "Other Income"}
+            </CardTitle>
+          </CardHeader>
+
+          <CardContent className="space-y-5 p-6">
+            <div className="rounded-xl border p-4">
+              <p className="text-sm text-muted">Amount</p>
+              <p className="text-3xl font-bold text-green-600">
+                {formatCurrency(income.amount)}
+              </p>
+            </div>
+
+            <div className="rounded-xl border p-4">
+              <p className="text-sm text-muted">Source</p>
+              <p className="text-lg font-semibold">
+                {income.source || "Other Income"}
+              </p>
+            </div>
+
+            <div className="rounded-xl border p-4">
+              <p className="text-sm text-muted">Date</p>
+              <p className="font-medium">
+                {income.date
+                  ? new Date(income.date).toLocaleDateString("en-IN")
+                  : "No date"}
+              </p>
+            </div>
+
+            <div className="rounded-xl border p-4">
+              <p className="text-sm text-muted">Income ID</p>
+              <p className="font-mono text-sm break-all">{income.id}</p>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t">
+              <Button variant="outline" onClick={loadIncome}>
+                🔄 Refresh
+              </Button>
+
+              <Button variant="destructive" onClick={deleteIncome}>
+                Delete Income
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </Layout>
   );
 }

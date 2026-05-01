@@ -31,7 +31,7 @@ export default function AddBudgetPage() {
     try {
       setLoading(true);
 
-      const res = await fetch("/api/category-budget", {
+      const res = await fetch("/api/budgets", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

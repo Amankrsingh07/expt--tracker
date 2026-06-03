@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -84,6 +84,8 @@ model Notification {
   body      String?
   type      String   @default("info")
   read      Boolean  @default(false)
-  meta      Json?
+  // SQLite in this project doesn't support Prisma Json type for local dev.
+  // Store meta as a JSON string for now.
+  meta      String?
   createdAt DateTime @default(now())
 }
